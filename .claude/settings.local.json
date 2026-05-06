@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"C:\\\\Users\\\\niraj\\\\OneDrive\\\\Documents\\\\GitHub\\\\personal-site\\\\\" | head -50)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\niraj\\\\OneDrive\\\\Documents\\\\GitHub\\\\personal-site\" -Recurse -Force | Select-Object -ExpandProperty FullName | Where-Object { $_ -notmatch '\\\\.git' -and $_ -notmatch '\\\\.claude' } | head -100)",
+      "Read(//c/Users/niraj/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/a56c62fb-4310-42c2-9db7-9edad560a807/78b27c03-d692-4512-b48a-ed290e8bf880/skills/docx/**)",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\niraj\\\\Downloads\\\\Niraj_Desai_Resume.docx\" \"C:\\\\Users\\\\niraj\\\\Downloads\\\\resume_unpacked\")",
+      "Bash(pandoc \"C:\\\\Users\\\\niraj\\\\Downloads\\\\Niraj_Desai_Resume.docx\" -t markdown)",
+      "Read(//c/Users/niraj/AppData/Roaming/**)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Users/niraj/**)",
+      "Bash(cmd /c \"where node 2>nul || echo NOT FOUND\")"
+    ]
+  }
+}
