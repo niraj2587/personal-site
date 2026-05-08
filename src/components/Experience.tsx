@@ -22,8 +22,8 @@ export default function Experience() {
           <div className="absolute left-3 top-2 bottom-2 w-px bg-gradient-to-b from-blue-500/40 via-slate-700/40 to-transparent" />
 
           <div className="space-y-10">
-            {resume.experience.map((job, i) => (
-              <div key={i} className="relative pl-12">
+            {resume.experience.map((job) => (
+              <div key={`${job.company}-${job.period}`} className="relative pl-12">
                 {/* Dot */}
                 <div className="absolute left-3 top-5 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-slate-950 ring-4 ring-blue-500/10" />
 
@@ -51,9 +51,9 @@ export default function Experience() {
                   </div>
 
                   <ul className="space-y-2.5">
-                    {job.bullets.map((bullet, j) => (
-                      <li key={j} className="flex gap-3 text-sm text-slate-400 leading-relaxed">
-                        <span className="text-blue-500 mt-1.5 shrink-0 text-xs">▹</span>
+                    {job.bullets.map((bullet) => (
+                      <li key={bullet} className="flex gap-3 text-sm text-slate-300 leading-relaxed">
+                        <span aria-hidden="true" className="text-blue-500 mt-1.5 shrink-0 text-xs">▹</span>
                         <span>{bullet}</span>
                       </li>
                     ))}

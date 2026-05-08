@@ -1,18 +1,19 @@
 const stats = [
   { value: '13+', label: 'Years Experience' },
-  { value: '3B+', label: 'Metrics / Minute' },
-  { value: '6PB', label: 'Logs / Month' },
+  { value: 'B+', label: 'Datapoints / Min' },
+  { value: 'PB+', label: 'Logs / Day' },
 ]
 
 export default function Hero() {
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
       {/* Background glow */}
-      <div className="absolute inset-0 bg-gradient-to-b from-blue-950/20 via-transparent to-transparent pointer-events-none" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[700px] bg-blue-600/5 rounded-full blur-3xl pointer-events-none" />
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-blue-950/20 via-transparent to-transparent pointer-events-none" />
+      <div aria-hidden="true" className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[700px] bg-blue-600/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* Subtle grid */}
       <div
+        aria-hidden="true"
         className="absolute inset-0 opacity-[0.025] pointer-events-none"
         style={{
           backgroundImage:
@@ -26,7 +27,7 @@ export default function Hero() {
           San Francisco Bay Area
         </p>
 
-        <h1 className="text-7xl md:text-9xl font-extrabold tracking-tight mb-5 leading-none">
+        <h1 className="text-6xl sm:text-7xl md:text-9xl font-extrabold tracking-tight mb-5 leading-none">
           <span className="bg-gradient-to-br from-slate-100 via-slate-200 to-slate-400 bg-clip-text text-transparent">
             Niraj
           </span>
@@ -36,11 +37,11 @@ export default function Hero() {
           </span>
         </h1>
 
-        <p className="text-xl md:text-2xl text-slate-400 font-medium mb-2">
+        <p className="text-xl md:text-2xl text-slate-300 font-medium mb-2">
           Principal Software Engineer
         </p>
-        <p className="text-sm md:text-base text-slate-600 mb-14 tracking-wide">
-          Cloud Infrastructure · Distributed Systems · AI-Native Observability
+        <p className="text-sm md:text-base text-slate-400 mb-14 tracking-wide">
+          Cloud Infrastructure · Distributed Systems · LLM-Native Observability
         </p>
 
         {/* Stats */}
@@ -59,9 +60,17 @@ export default function Hero() {
         <div className="flex flex-wrap justify-center gap-4">
           <a
             href="#experience"
-            className="px-7 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all hover:scale-105 active:scale-100 shadow-lg shadow-blue-900/30"
+            className="px-7 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all hover:scale-105 active:scale-100 motion-reduce:transition-none motion-reduce:hover:scale-100 shadow-lg shadow-blue-900/30"
           >
             View Experience
+          </a>
+          <a
+            href="/resume.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-7 py-3.5 rounded-xl border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-slate-100 font-semibold transition-all"
+          >
+            Resume (PDF)
           </a>
           <a
             href="#contact"
@@ -73,8 +82,8 @@ export default function Hero() {
       </div>
 
       {/* Scroll indicator */}
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce-slow">
-        <svg className="w-5 h-5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div aria-hidden="true" className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce-slow motion-reduce:animate-none">
+        <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </div>

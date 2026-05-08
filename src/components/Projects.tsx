@@ -11,9 +11,9 @@ export default function Projects() {
         <h2 className="text-4xl font-bold text-slate-100 mb-16">Featured Work</h2>
 
         <div ref={ref} className="section-reveal grid md:grid-cols-2 gap-5">
-          {resume.projects.map((project, i) => (
+          {resume.projects.map((project) => (
             <div
-              key={i}
+              key={project.name}
               className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col hover:border-blue-500/30 hover:bg-slate-900/80 transition-all group"
             >
               <div className="flex items-start justify-between gap-4 mb-3">
@@ -29,10 +29,10 @@ export default function Projects() {
                       href={project.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-slate-500 hover:text-blue-400 transition-colors"
-                      aria-label="View project"
+                      className="text-slate-400 hover:text-blue-400 transition-colors"
+                      aria-label={`View ${project.name} on GitHub`}
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -45,7 +45,7 @@ export default function Projects() {
                 </div>
               </div>
 
-              <p className="text-slate-400 text-sm leading-relaxed mb-5 flex-1">{project.description}</p>
+              <p className="text-slate-300 text-sm leading-relaxed mb-5 flex-1">{project.description}</p>
 
               <div className="flex flex-wrap gap-2">
                 {project.tags.map((tag) => (

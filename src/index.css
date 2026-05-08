@@ -4,6 +4,7 @@
 
 @layer base {
   html {
+    @apply bg-slate-950;
     scroll-behavior: smooth;
   }
 
@@ -13,6 +14,19 @@
 
   ::selection {
     @apply bg-blue-500/30 text-blue-200;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
   }
 }
 
@@ -26,5 +40,12 @@
   .section-reveal.visible {
     opacity: 1;
     transform: translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .section-reveal {
+      opacity: 1;
+      transform: none;
+    }
   }
 }

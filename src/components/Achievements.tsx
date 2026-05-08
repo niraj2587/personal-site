@@ -12,18 +12,13 @@ export default function Achievements() {
       <div ref={ref} className="section-reveal">
         {/* Achievement cards */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-16">
-          {resume.achievements.map((item, i) => (
+          {resume.achievements.map((item) => (
             <div
-              key={i}
+              key={item.title}
               className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-slate-700 transition-colors"
             >
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-5">
-                <span className="text-blue-400 font-bold text-sm font-mono">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-              </div>
-              <h3 className="text-slate-100 font-semibold mb-2 text-sm">{item.title}</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">{item.description}</p>
+              <h3 className="text-slate-100 font-semibold mb-3 text-base">{item.title}</h3>
+              <p className="text-slate-300 text-sm leading-relaxed">{item.description}</p>
             </div>
           ))}
         </div>
@@ -34,13 +29,13 @@ export default function Achievements() {
             Education
           </h3>
           <div className="grid sm:grid-cols-2 gap-4">
-            {resume.education.map((edu, i) => (
+            {resume.education.map((edu) => (
               <div
-                key={i}
+                key={edu.degree}
                 className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex gap-4 hover:border-slate-700 transition-colors"
               >
                 <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center shrink-0">
-                  <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg aria-hidden="true" className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -50,13 +45,10 @@ export default function Achievements() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-slate-200 font-semibold text-sm mb-1">{edu.degree}</p>
-                  <p className="text-slate-500 text-xs">
+                  <p className="text-slate-100 font-semibold text-sm mb-1">{edu.degree}</p>
+                  <p className="text-slate-400 text-xs">
                     {edu.school} · {edu.year}
                   </p>
-                  {edu.gpa && (
-                    <p className="text-slate-600 text-xs mt-1">GPA: {edu.gpa}</p>
-                  )}
                 </div>
               </div>
             ))}

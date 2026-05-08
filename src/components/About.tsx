@@ -18,17 +18,17 @@ export default function About() {
           <h2 className="text-4xl font-bold text-slate-100 mb-6 leading-tight">
             Building systems at<br />the edge of scale
           </h2>
-          <p className="text-slate-400 leading-relaxed mb-5">
-            Principal Software Engineer with 13+ years building enterprise-scale distributed systems,
-            high-throughput data pipelines, and cloud infrastructure. Currently at Salesforce leading
-            engineering on two platforms that collectively handle some of the largest monitoring
-            workloads in the industry.
+          <p className="text-slate-300 leading-relaxed mb-5">
+            Principal Software Engineer with 13+ years building enterprise-scale distributed systems
+            and cloud infrastructure. At Salesforce I lead engineering on Argus — the central
+            time-series metrics platform — and on a conversational, LLM-native telemetry surface
+            that unifies metrics, logs, and traces.
           </p>
-          <p className="text-slate-400 leading-relaxed">
-            My work lives at the intersection of infrastructure and intelligence — designing systems
-            that don't just scale, but get smarter. From building Salesforce's first LLM-native
-            observability service to architecting petabyte-scale log federation, I focus on the hard
-            problems where correctness and performance both matter.
+          <p className="text-slate-300 leading-relaxed">
+            Most of my work lately sits at the boundary between infrastructure and applied LLMs:
+            tool-calling APIs that let model runtimes query observability data directly, MCP servers
+            that pull production logs into the IDE during incident triage, and the kind of plumbing
+            that makes those things behave under real load.
           </p>
         </div>
 
