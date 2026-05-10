@@ -1,13 +1,13 @@
 # personal-site
 
-My personal site at **https://nirajjd.com** — React + Vite + Tailwind, hosted on Vercel.
+My personal site at **https://nirajjd.com** — React + Vite + Tailwind, hosted on Cloudflare Pages.
 
 ## Stack
 
 - React 18 + TypeScript
 - Vite 5 (build tool + dev server)
 - Tailwind CSS 3
-- Deployed via Vercel, domain managed at Squarespace
+- Deployed via Cloudflare Pages, domain managed at Squarespace
 
 ## Local development
 
@@ -18,11 +18,11 @@ npm run build    # tsc + vite build → dist/
 npm run preview  # serve the prod build locally
 ```
 
-## Hosting — Vercel
+## Hosting — Cloudflare Pages
 
 Project is wired to GitHub: every push to `main` auto-builds and deploys.
 
-- **Host:** Vercel (free tier)
+- **Host:** Cloudflare Pages (free tier)
 - **Repo connected:** `niraj2587/personal-site`
 - **Production branch:** `main`
 - **Framework preset:** Vite (auto-detected)
@@ -30,23 +30,22 @@ Project is wired to GitHub: every push to `main` auto-builds and deploys.
 - **Output directory:** `dist`
 - **Install command:** `npm install`
 
-Preview deployments: every non-`main` branch and PR gets its own `*.vercel.app` URL.
+Preview deployments: every non-`main` branch and PR gets its own `*.pages.dev` URL.
 
 ### Custom domain
 
 `nirajjd.com` is registered at Squarespace (registrar only — no Squarespace site
-or builder subscription). DNS points at Vercel:
+or builder subscription). DNS is proxied through Cloudflare:
 
-| Type  | Host | Value                  |
-|-------|------|------------------------|
-| A     | @    | `76.76.21.21`          |
-| CNAME | www  | `cname.vercel-dns.com` |
+| Type  | Host | Value                          |
+|-------|------|--------------------------------|
+| A     | @    | Cloudflare Pages (proxied)     |
+| CNAME | www  | `<project>.pages.dev` (proxied)|
 
-(Confirm exact values in Vercel → Project → Settings → Domains. They occasionally update the apex IP.)
+(Confirm exact values in Cloudflare dashboard → Pages → Custom domains.)
 
-TLS cert is issued and renewed automatically by Vercel. If the cert ever shows
-"Invalid Configuration", check that the DNS records above still match what
-Vercel shows on the Domains page.
+TLS cert is issued and renewed automatically by Cloudflare (Universal SSL). The
+site is also served behind Cloudflare's CDN/proxy by default.
 
 ## Where things live
 
@@ -63,7 +62,7 @@ directory (`../Niraj - Resume v2.docx`). To regenerate:
 
 1. Edit the docx in Pages or Word
 2. Export as PDF, replacing `public/resume.pdf`
-3. Commit and push — Vercel redeploys
+3. Commit and push — Cloudflare Pages redeploys
 
 ## SSH / git setup
 
