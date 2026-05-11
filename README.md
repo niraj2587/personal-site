@@ -1,13 +1,13 @@
 # personal-site
 
-My personal site at **https://nirajjd.com** — React + Vite + Tailwind, hosted on Cloudflare Pages.
+My personal site at **https://nirajjd.com** — React + Vite + Tailwind, hosted on GitHub Pages.
 
 ## Stack
 
 - React 18 + TypeScript
 - Vite 5 (build tool + dev server)
 - Tailwind CSS 3
-- Deployed via Cloudflare Pages, domain managed at Squarespace
+- Deployed via GitHub Pages (Actions workflow), domain DNS managed at Cloudflare
 
 ## Local development
 
@@ -18,34 +18,36 @@ npm run build    # tsc + vite build → dist/
 npm run preview  # serve the prod build locally
 ```
 
-## Hosting — Cloudflare Pages
+## Hosting — GitHub Pages
 
-Project is wired to GitHub: every push to `main` auto-builds and deploys.
+Project is wired to GitHub Actions: every push to `main` auto-builds and deploys
+via `.github/workflows/deploy.yml`.
 
-- **Host:** Cloudflare Pages (free tier)
-- **Repo connected:** `niraj2587/personal-site`
+- **Host:** GitHub Pages (free)
+- **Repo:** `niraj2587/personal-site`
 - **Production branch:** `main`
-- **Framework preset:** Vite (auto-detected)
 - **Build command:** `npm run build`
 - **Output directory:** `dist`
-- **Install command:** `npm install`
-
-Preview deployments: every non-`main` branch and PR gets its own `*.pages.dev` URL.
+- **CNAME file:** `CNAME` (contains `nirajjd.com`)
 
 ### Custom domain
 
-`nirajjd.com` is registered at Squarespace (registrar only — no Squarespace site
-or builder subscription). DNS is proxied through Cloudflare:
+`nirajjd.com` is registered at Squarespace (registrar only). Nameservers point
+to Cloudflare (used as DNS-only, no proxy needed). DNS records in Cloudflare:
 
-| Type  | Host | Value                          |
-|-------|------|--------------------------------|
-| A     | @    | Cloudflare Pages (proxied)     |
-| CNAME | www  | `<project>.pages.dev` (proxied)|
+| Type  | Host | Value                    | Proxy   |
+|-------|------|--------------------------|---------|
+| A     | @    | `185.199.108.153`        | DNS only|
+| A     | @    | `185.199.109.153`        | DNS only|
+| A     | @    | `185.199.110.153`        | DNS only|
+| A     | @    | `185.199.111.153`        | DNS only|
+| CNAME | www  | `niraj2587.github.io`    | DNS only|
 
-(Confirm exact values in Cloudflare dashboard → Pages → Custom domains.)
+These are GitHub Pages' IPs. Records must be **DNS only** (grey cloud), not
+proxied — GitHub issues and renews the TLS cert itself.
 
-TLS cert is issued and renewed automatically by Cloudflare (Universal SSL). The
-site is also served behind Cloudflare's CDN/proxy by default.
+Enable the custom domain in GitHub: Repo → Settings → Pages → Custom domain →
+enter `nirajjd.com` → Save. GitHub will verify DNS and issue a cert.
 
 ## Where things live
 
@@ -62,7 +64,7 @@ directory (`../Niraj - Resume v2.docx`). To regenerate:
 
 1. Edit the docx in Pages or Word
 2. Export as PDF, replacing `public/resume.pdf`
-3. Commit and push — Cloudflare Pages redeploys
+3. Commit and push — GitHub Pages redeploys
 
 ## SSH / git setup
 
