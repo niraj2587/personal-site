@@ -7,7 +7,7 @@ My personal site at **https://nirajjd.com** — React + Vite + Tailwind, hosted 
 - React 18 + TypeScript
 - Vite 5 (build tool + dev server)
 - Tailwind CSS 3
-- Deployed via GitHub Pages (Actions workflow), domain DNS managed at Cloudflare
+- Deployed via GitHub Pages (Actions workflow), domain DNS managed at Squarespace
 
 ## Local development
 
@@ -32,22 +32,21 @@ via `.github/workflows/deploy.yml`.
 
 ### Custom domain
 
-`nirajjd.com` is registered at Squarespace (registrar only). Nameservers point
-to Cloudflare (used as DNS-only, no proxy needed). DNS records in Cloudflare:
+`nirajjd.com` is registered at Squarespace (registrar + DNS). DNS records in
+Squarespace:
 
-| Type  | Host | Value                    | Proxy   |
-|-------|------|--------------------------|---------|
-| A     | @    | `185.199.108.153`        | DNS only|
-| A     | @    | `185.199.109.153`        | DNS only|
-| A     | @    | `185.199.110.153`        | DNS only|
-| A     | @    | `185.199.111.153`        | DNS only|
-| CNAME | www  | `niraj2587.github.io`    | DNS only|
+| Type  | Host | Value                    |
+|-------|------|--------------------------|
+| A     | @    | `185.199.108.153`        |
+| A     | @    | `185.199.109.153`        |
+| A     | @    | `185.199.110.153`        |
+| A     | @    | `185.199.111.153`        |
+| CNAME | www  | `niraj2587.github.io`    |
 
-These are GitHub Pages' IPs. Records must be **DNS only** (grey cloud), not
-proxied — GitHub issues and renews the TLS cert itself.
+These are GitHub Pages' IPs. GitHub issues and renews the TLS cert itself.
 
-Enable the custom domain in GitHub: Repo → Settings → Pages → Custom domain →
-enter `nirajjd.com` → Save. GitHub will verify DNS and issue a cert.
+Custom domain is configured in GitHub: Repo → Settings → Pages → Custom domain →
+`nirajjd.com`. "Enforce HTTPS" is checked.
 
 ## Where things live
 
