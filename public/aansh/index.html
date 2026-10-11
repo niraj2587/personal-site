@@ -210,7 +210,8 @@
       sales: [],      // {id, sessionId, at, items:[{productId,name,price,qty}], total, payment, cashGiven, voided, v, sv}
       currentSessionId: null,
       syncUrl: '',
-      password: '',
+      token: '',      // device key from the server; preferred over password
+      password: '',   // only kept if the server is too old to issue keys
       lastSyncAt: null,
       lastSyncError: null,
     };
@@ -302,7 +303,19 @@
   // ---------- render ----------
   const view = $('#view');
 
-  const unlocked = () => !!(S.syncUrl && S.password);
+  const unlocked = () => !!(S.syncUrl && (S.token || S.password));
+  const auth = () => S.token ? { token: S.token } : { password: S.password };
+  const post = async body => (await fetch(S.syncUrl, {
+    method: 'POST', body: JSON.stringify(body),
+    // text/plain avoids a CORS preflight, which Apps Script can't answer.
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+  })).json();
+  function signIn(out, pw) {
+    if (out.token) { S.token = out.token; S.password = ''; }
+    else S.password = pw;
+    save();
+  }
+  function signOut() { S.token = ''; S.password = ''; save(); }
 
   function render() {
     document.querySelector('nav.tabs').classList.toggle('hidden', !unlocked());
@@ -340,9 +353,8 @@
       if (!pw) return;
       $('#lockBtn').disabled = true; msg.textContent = 'Checking…';
       try {
-        const res = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'login', password: pw }), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
-        const out = await res.json();
-        if (out.ok) { S.password = pw; save(); toast('🔓 Welcome, Aansh!'); render(); sync(); return; }
+        const out = await post({ action: 'login', password: pw });
+        if (out.ok) { signIn(out, pw); toast('🔓 Welcome, Aansh!'); render(); sync(); return; }
         msg.textContent = out.error === 'locked' ? 'Too many wrong tries. Wait 15 minutes.' : 'Wrong password.';
       } catch (e) {
         msg.textContent = 'Could not reach the store. Check your internet.';
@@ -725,12 +737,12 @@
     $('#lockNow').onclick = () => {
       if (S.sales.some(dirty) || S.sessions.some(dirty)) return toast('Sync first — some sales are not in the sheet yet');
       if (!confirm('Lock the app? You will need the password to get back in.')) return;
-      S.password = ''; save(); render();
+      signOut(); render();
     };
     $('#wipe').onclick = () => {
       if (!confirm('Erase ALL products, market days and sales from this phone? This cannot be undone.')) return;
       if (prompt('Type ERASE to confirm') !== 'ERASE') return;
-      S = Object.assign(freshState(), { syncUrl: S.syncUrl, password: S.password }); clearCart(); save(); tab = 'sell'; render();
+      S = Object.assign(freshState(), { syncUrl: S.syncUrl, token: S.token, password: S.password }); clearCart(); save(); tab = 'sell'; render();
     };
   }
 
@@ -767,7 +779,6 @@
     syncing = true;
     const sentV = new Map([...sessions, ...sales].map(r => [r.id, r.v]));
     const payload = {
-      password: S.password,
       sessions: sessions.map(s => {
         const sm = summarize(salesFor(s.id));
         return { id: s.id, market: s.market, openedAt: s.openedAt, closedAt: s.closedAt, startCash: (s.startCash || 0) / 100,
@@ -781,10 +792,9 @@
       }),
     };
     try {
-      // text/plain avoids a CORS preflight, which Apps Script can't answer.
-      const res = await fetch(S.syncUrl, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
-      const out = await res.json();
-      if (out.error === 'unauthorized') { S.password = ''; toast('🔒 Password changed — please unlock again'); return; }
+      await upgradeToKey();
+      const out = await post({ ...auth(), ...payload });
+      if (out.error === 'unauthorized') { signOut(); toast('🔒 Please unlock again'); return; }
       if (!out.ok) throw new Error(out.error || 'Sheet said no');
       for (const r of [...S.sessions, ...S.sales]) if (sentV.has(r.id)) r.sv = sentV.get(r.id);
       S.lastSyncAt = new Date().toISOString();
@@ -800,6 +810,17 @@
       if (tab === 'settings' || !unlocked()) render();
     }
   }
+  // Phones logged in before device keys existed: swap the saved password for a key.
+  let triedUpgrade = false;
+  async function upgradeToKey() {
+    if (S.token || !S.password || triedUpgrade) return;
+    triedUpgrade = true;
+    try {
+      const out = await post({ action: 'login', password: S.password });
+      if (out.ok && out.token) signIn(out);
+    } catch (e) { /* offline; try again next page load */ }
+  }
+
   window.addEventListener('online', () => sync());
   setInterval(() => sync(), 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
@@ -811,7 +832,7 @@
   $('#syncPill').onclick = () => sync(true);
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
   render();
-  sync();
+  upgradeToKey().then(() => sync());
 })();
 </script>
 </body>

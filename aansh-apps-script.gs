@@ -10,8 +10,15 @@
  *        Who has access: Anyone
  *      Authorize when asked, then copy the Web app URL (ends in /exec).
  *
- * "Anyone" only means the URL can be called. Every request must carry the
- * password, and after 10 wrong tries in 15 minutes all logins are refused.
+ * "Anyone" only means the URL can be called. Security works in two layers:
+ *   - Logging in a phone needs the password. After 10 wrong tries in
+ *     15 minutes, new logins are refused for a while.
+ *   - A successful login gives that phone a long random device key. All its
+ *     syncing uses the key, which can't be guessed, so the lockout above
+ *     never affects a phone that is already logged in.
+ *
+ * Lost a phone or changed the password? Run revokeAllDevices() from the
+ * editor (pick it in the function dropdown → Run). Every phone must log in again.
  *
  * If you edit this script later: Deploy → Manage deployments → ✏️ → Version:
  * "New version" → Deploy. That keeps the same URL.
@@ -26,6 +33,18 @@ function doPost(e) {
   let data;
   try { data = JSON.parse(e.postData.contents); } catch (err) { return json({ ok: false, error: 'bad request' }); }
 
+  const props = PropertiesService.getScriptProperties();
+
+  // Logged-in phones: device key only, never subject to the lockout.
+  if (data.token) {
+    if (!/^[a-f0-9]{64}$/.test(data.token) || !props.getProperty('tok_' + data.token)) {
+      return json({ ok: false, error: 'unauthorized' });
+    }
+    if (data.action === 'login') return json({ ok: true, token: data.token });
+    return saveSales(data);
+  }
+
+  // Password: rate-limited.
   const cache = CacheService.getScriptCache();
   const fails = Number(cache.get('fails') || 0);
   if (fails >= 10) return json({ ok: false, error: 'locked' });
@@ -34,8 +53,22 @@ function doPost(e) {
     return json({ ok: false, error: 'unauthorized' });
   }
 
-  if (data.action === 'login') return json({ ok: true });
+  if (data.action === 'login') {
+    const token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+    props.setProperty('tok_' + token, new Date().toISOString());
+    return json({ ok: true, token: token });
+  }
+  return saveSales(data);
+}
 
+function revokeAllDevices() {
+  const props = PropertiesService.getScriptProperties();
+  const keys = props.getKeys().filter(k => k.indexOf('tok_') === 0);
+  keys.forEach(k => props.deleteProperty(k));
+  Logger.log('Logged out ' + keys.length + ' device(s).');
+}
+
+function saveSales(data) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
