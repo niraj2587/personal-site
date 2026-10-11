@@ -160,6 +160,15 @@
     animation: pop .2s ease-out;
   }
   @keyframes pop { from { opacity: 0; transform: translate(-50%, 10px); } }
+  .modal-bg {
+    position: fixed; inset: 0; z-index: 30; background: rgba(20, 28, 20, .45);
+    display: flex; align-items: flex-end; justify-content: center; padding: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+  @media (min-width: 560px) { .modal-bg { align-items: center; } }
+  .modal { background: var(--card); border-radius: 20px; padding: 20px; width: 100%; max-width: 440px; animation: pop .15s ease-out; }
+  .modal p { margin: 0 0 6px; white-space: pre-line; font-size: 17px; }
+  .modal .row { margin-top: 16px; }
   .empty { text-align: center; padding: 28px 10px; color: var(--muted); }
   .row { display: flex; gap: 10px; }
   .row > * { flex: 1; }
@@ -283,6 +292,34 @@
   const byTime = k => (a, b) => (a[k] < b[k] ? -1 : a[k] > b[k] ? 1 : 0);
   const liveSessions = () => S.sessions.filter(s => !s.deleted).sort(byTime('openedAt'));
   // The open market day is shared: whichever phone opened it, everyone sells into it.
+  // In-page dialogs. Built-in confirm()/prompt() are blocked silently by some
+  // embedded browsers, which made buttons like "Close store" do nothing.
+  function dialog({ message, fields = [], ok = 'OK', danger = false }) {
+    return new Promise(resolve => {
+      const bg = document.createElement('div');
+      bg.className = 'modal-bg';
+      bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+        <p>${esc(message)}</p>
+        ${fields.map((f, i) => `<label class="field"><span>${esc(f.label)}</span>
+          <input data-i="${i}" type="${f.type || 'text'}" ${f.inputmode ? `inputmode="${f.inputmode}"` : ''} placeholder="${esc(f.placeholder || '')}" value="${esc(f.value || '')}"></label>`).join('')}
+        <div class="row">
+          <button class="btn ghost" data-act="cancel">Cancel</button>
+          <button class="btn ${danger ? 'danger' : 'primary'}" data-act="ok">${esc(ok)}</button>
+        </div></div>`;
+      const done = val => { bg.remove(); document.removeEventListener('keydown', onKey); resolve(val); };
+      const submit = () => done(fields.length ? [...bg.querySelectorAll('input')].map(i => i.value) : true);
+      const onKey = e => { if (e.key === 'Escape') done(null); if (e.key === 'Enter') submit(); };
+      bg.onclick = e => { if (e.target === bg) done(null); };
+      bg.querySelector('[data-act=cancel]').onclick = () => done(null);
+      bg.querySelector('[data-act=ok]').onclick = submit;
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(bg);
+      const first = bg.querySelector('input');
+      if (first) first.focus();
+    });
+  }
+  const ask = (message, opts = {}) => dialog({ message, ...opts }).then(Boolean);
+
   const currentSession = () => liveSessions().filter(s => !s.closedAt).pop() || null;
   const salesFor = sid => S.sales.filter(x => x.sessionId === sid).sort(byTime('at'));
   const liveSales = () => { const ok = new Set(liveSessions().map(s => s.id)); return S.sales.filter(x => ok.has(x.sessionId)); };
@@ -488,13 +525,21 @@
     });
     view.querySelectorAll('[data-pay]').forEach(b => b.onclick = () => { payment = b.dataset.pay; if (payment !== 'Cash') cashGiven = null; render(); });
     view.querySelectorAll('[data-cash]').forEach(b => b.onclick = () => { cashGiven = +b.dataset.cash; render(); });
-    $('#customBtn').onclick = () => {
-      const amt = prompt('Custom amount in dollars (use a minus sign for a discount, e.g. -1):');
-      if (amt == null) return;
+    $('#customBtn').onclick = async () => {
+      const vals = await dialog({
+        message: 'Custom amount',
+        fields: [
+          { label: 'Dollars (use a minus sign for a discount, e.g. -1)', inputmode: 'decimal', placeholder: '2.50' },
+          { label: 'What is it for? (optional)', placeholder: 'e.g. Tip, Bundle deal' },
+        ],
+        ok: 'Add to sale',
+      });
+      if (!vals) return;
+      const [amt, what] = vals;
       const neg = String(amt).trim().startsWith('-');
       const cents = toCents(amt) * (neg ? -1 : 1);
       if (!cents) return toast('That amount did not look right');
-      const note = prompt('What is it for? (optional)', neg ? 'Discount' : 'Custom') || (neg ? 'Discount' : 'Custom');
+      const note = what.trim() || (neg ? 'Discount' : 'Custom');
       const k = 'custom:' + uid();
       customLines[k] = { name: note, price: cents };
       cart[k] = 1;
@@ -502,10 +547,10 @@
     };
     $('#clearBtn').onclick = () => { clearCart(); render(); };
     $('#doneBtn').onclick = completeSale;
-    $('#undoBtn').onclick = () => {
+    $('#undoBtn').onclick = async () => {
       const last = salesFor(cs.id).filter(x => !x.voided).pop();
       if (!last) return;
-      if (!confirm(`Undo the last sale (${money2(last.total)}, ${last.items.map(i => `${i.qty}× ${i.name}`).join(', ')})?`)) return;
+      if (!await ask(`Undo the last sale?\n${money2(last.total)} — ${last.items.map(i => `${i.qty}× ${i.name}`).join(', ')}`, { ok: 'Undo sale', danger: true })) return;
       voidSale(last.id);
     };
   }
@@ -592,9 +637,9 @@
   }
 
   function bindReport() {
-    view.querySelectorAll('[data-void]').forEach(b => b.onclick = () => {
+    view.querySelectorAll('[data-void]').forEach(b => b.onclick = async () => {
       const s = S.sales.find(x => x.id === b.dataset.void);
-      if (!s.voided && !confirm(`Remove this ${money2(s.total)} sale? (Use this for mistakes or refunds.)`)) return;
+      if (!s.voided && !await ask(`Remove this ${money2(s.total)} sale?\nUse this for mistakes or refunds.`, { ok: 'Remove', danger: true })) return;
       voidSale(b.dataset.void);
     });
   }
@@ -610,9 +655,10 @@
     }
     view.innerHTML = sessionReport(cs, { showClose: true });
     bindReport();
-    $('#closeBtn').onclick = () => {
+    $('#closeBtn').onclick = async () => {
       const sum = summarize(salesFor(cs.id));
-      if (!confirm(`Close the store?\n\nYou earned ${money2(sum.revenue)} from ${sum.count} sales today. 🎉`)) return;
+      if (!await ask(`Close the store?\nYou earned ${money2(sum.revenue)} from ${sum.count} sales today. 🎉`, { ok: 'Close store', danger: true })) return;
+      if (cs.closedAt) return render();   // another phone closed it meanwhile
       cs.closedAt = new Date().toISOString();
       touch(cs);
       clearCart();
@@ -632,8 +678,8 @@
         bindReport();
         $('#backBtn').onclick = () => { viewingSessionId = null; render(); };
         const del = $('#delSess');
-        if (del) del.onclick = () => {
-          if (!confirm('Delete this whole market day on every phone? (The Google Sheet keeps it, marked Deleted.)')) return;
+        if (del) del.onclick = async () => {
+          if (!await ask('Delete this whole market day on every phone?\nThe Google Sheet keeps it, marked Deleted.', { ok: 'Delete', danger: true })) return;
           sess.deleted = true; touch(sess);
           viewingSessionId = null; save(); sync(); render();
         };
@@ -734,9 +780,9 @@
         touch(p); save(); sync(); toast('Saved');
       });
     });
-    view.querySelectorAll('[data-delp]').forEach(b => b.onclick = () => {
+    view.querySelectorAll('[data-delp]').forEach(b => b.onclick = async () => {
       const p = S.products.find(x => x.id === b.dataset.delp);
-      if (!confirm(`Delete “${p.name}” on every phone? Past sales keep their record.`)) return;
+      if (!await ask(`Delete “${p.name}” on every phone?\nPast sales keep their record.`, { ok: 'Delete', danger: true })) return;
       p.deleted = true; touch(p);
       delete cart[p.id];
       save(); sync(); render();
@@ -762,15 +808,18 @@
     };
     $('#csv2').onclick = exportCsv;
     $('#backup').onclick = () => download(`aansh-pos-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(S, null, 2), 'application/json');
-    $('#lockNow').onclick = () => {
+    $('#lockNow').onclick = async () => {
       if (allRecords().some(dirty)) return toast('Sync first — some changes are not in the sheet yet');
-      if (!confirm('Lock the app? You will need the password to get back in.')) return;
+      if (!await ask('Lock the app?\nYou will need the password to get back in.', { ok: 'Lock' })) return;
       signOut(); render();
     };
-    $('#wipe').onclick = () => {
+    $('#wipe').onclick = async () => {
       const unsent = allRecords().filter(dirty).length;
-      if (!confirm(`Clear this phone's copy and download everything again from the sheet?${unsent ? `\n\n⚠️ ${unsent} change(s) have NOT synced yet and will be lost.` : ''}`)) return;
-      if (unsent && prompt('Type RESET to confirm') !== 'RESET') return;
+      const msg = `Clear this phone's copy and download everything again from the sheet?`;
+      if (unsent) {
+        const vals = await dialog({ message: `${msg}\n⚠️ ${unsent} change(s) have NOT synced yet and will be lost.`, fields: [{ label: 'Type RESET to confirm' }], ok: 'Reset', danger: true });
+        if (!vals || vals[0].trim().toUpperCase() !== 'RESET') return;
+      } else if (!await ask(msg, { ok: 'Reset', danger: true })) return;
       S = Object.assign(freshState(), { syncUrl: S.syncUrl, token: S.token, password: S.password }); clearCart(); save(); tab = 'sell'; render(); sync(true);
     };
   }
