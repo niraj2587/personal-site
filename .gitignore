@@ -22,3 +22,6 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+
+# Claude Code local settings (can contain tokens)
+.claude/settings.local.json
