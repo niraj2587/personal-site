@@ -166,7 +166,8 @@
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
   }
   @media (min-width: 560px) { .modal-bg { align-items: center; } }
-  .modal { background: var(--card); border-radius: 20px; padding: 20px; width: 100%; max-width: 440px; animation: pop .15s ease-out; }
+  .modal { background: var(--card); border-radius: 20px; padding: 20px; width: 100%; max-width: 440px; animation: rise .15s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
   .modal p { margin: 0 0 6px; white-space: pre-line; font-size: 17px; }
   .modal .row { margin-top: 16px; }
   .empty { text-align: center; padding: 28px 10px; color: var(--muted); }
@@ -657,7 +658,7 @@
     bindReport();
     $('#closeBtn').onclick = async () => {
       const sum = summarize(salesFor(cs.id));
-      if (!await ask(`Close the store?\nYou earned ${money2(sum.revenue)} from ${sum.count} sales today. 🎉`, { ok: 'Close store', danger: true })) return;
+      if (!await ask(`Close the store?\nYou earned ${money2(sum.revenue)} from ${sum.count} sale${sum.count === 1 ? "" : "s"} today. 🎉`, { ok: 'Close store', danger: true })) return;
       if (cs.closedAt) return render();   // another phone closed it meanwhile
       cs.closedAt = new Date().toISOString();
       touch(cs);
