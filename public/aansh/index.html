@@ -233,15 +233,9 @@
   const touch = rec => { rec.v = (rec.v || 0) + 1; };
   const dirty = rec => (rec.v || 0) !== (rec.sv || 0);
 
-  // One-time setup link: nirajjd.com/aansh/#sync=<apps script url>
-  (function readSetupHash() {
-    const m = location.hash.match(/sync=([^&]+)/);
-    if (m) {
-      S.syncUrl = decodeURIComponent(m[1]);
-      save();
-      history.replaceState(null, '', location.pathname);
-    }
-  })();
+  // Store server (Apps Script web app). Encoded only to keep it out of plain sight;
+  // the server itself rejects anything without the password.
+  S.syncUrl = atob('aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J3QVFIZ3JMMlNnVVlNMGlvWURkYXA3dDN4WUg2SVRSZXJBUmR0U0lrdGt4WHdhY0NJaWVFNzBGLU42TVhhZ2FYX0UvZXhlYw==');
 
   // ---------- helpers ----------
   const $ = (sel, el = document) => el.querySelector(sel);
@@ -334,27 +328,24 @@
         <div style="font-size:48px">🔒</div>
         <h2 style="margin-top:6px">This store is private</h2>
         <p class="muted">Enter the store password to start selling.</p>
-        <label class="field ${S.syncUrl ? 'hidden' : ''}" style="text-align:left"><span>Setup link (ask Niraj)</span>
-          <input id="lockUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec"></label>
         <label class="field" style="text-align:left"><span>Password</span>
           <input id="lockPw" type="password" autocomplete="current-password"></label>
         <button class="btn primary block big" id="lockBtn">Unlock</button>
         <p id="lockMsg" class="muted" style="min-height:1.4em"></p>
       </div>`;
     const go = async () => {
-      const url = S.syncUrl || $('#lockUrl').value.trim();
+      const url = S.syncUrl;
       const pw = $('#lockPw').value;
       const msg = $('#lockMsg');
-      if (!url) { msg.textContent = 'Ask Niraj for the setup link.'; return; }
       if (!pw) return;
       $('#lockBtn').disabled = true; msg.textContent = 'Checking…';
       try {
         const res = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'login', password: pw }), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
         const out = await res.json();
-        if (out.ok) { S.syncUrl = url; S.password = pw; save(); toast('🔓 Welcome, Aansh!'); render(); sync(); return; }
+        if (out.ok) { S.password = pw; save(); toast('🔓 Welcome, Aansh!'); render(); sync(); return; }
         msg.textContent = out.error === 'locked' ? 'Too many wrong tries. Wait 15 minutes.' : 'Wrong password.';
       } catch (e) {
-        msg.textContent = 'Could not reach the store server. Check internet or the setup link.';
+        msg.textContent = 'Could not reach the store. Check your internet.';
       }
       $('#lockBtn').disabled = false;
     };
