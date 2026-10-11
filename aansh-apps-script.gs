@@ -27,7 +27,7 @@
 const PASSWORD = 'change-me';
 
 const SALES_HEADERS = ['Line ID', 'Sale ID', 'Date', 'Time', 'Market', 'Item', 'Qty', 'Unit Price', 'Line Total', 'Payment', 'Removed', 'Session ID'];
-const SESSION_HEADERS = ['Session ID', 'Market', 'Opened', 'Closed', 'Starting Cash', 'Sales', 'Items Sold', 'Revenue', 'Cash', 'Non-cash'];
+const SESSION_HEADERS = ['Session ID', 'Market', 'Opened', 'Closed', 'Starting Cash', 'Sales', 'Items Sold', 'Revenue', 'Cash', 'Non-cash', 'Deleted'];
 
 function doPost(e) {
   let data;
@@ -74,7 +74,99 @@ function saveSales(data) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const tz = ss.getSpreadsheetTimeZone();
+    if (Array.isArray(data.records)) return json(syncRecords(ss, tz, data));
+    legacySave(ss, tz, data);
+    return json({ ok: true });
+  } catch (err) {
+    return json({ ok: false, error: String(err) });
+  } finally {
+    lock.releaseLock();
+  }
+}
 
+/**
+ * Two-way sync. The hidden "_data" tab is the master copy shared by every
+ * phone: one row per record (market day, sale, product, settings).
+ * Phones push what they changed and get back everything changed since
+ * their last sync. Newest edit (by its "u" timestamp) wins.
+ */
+const DB_SHEET = '_data';
+const TYPES = { session: true, sale: true, product: true, config: true };
+
+function syncRecords(ss, tz, data) {
+  let db = ss.getSheetByName(DB_SHEET);
+  if (!db) {
+    db = ss.insertSheet(DB_SHEET);
+    db.getRange('A:E').setNumberFormat('@');
+    db.appendRow(['ID', 'Type', 'Edited', 'Server Time', 'Record']);
+    db.hideSheet();
+  }
+  const last = db.getLastRow();
+  const byId = new Map();
+  if (last > 1) {
+    db.getRange(2, 1, last - 1, 5).getValues().forEach((r, i) => {
+      byId.set(String(r[0]), { row: i + 2, u: Number(r[2]), srv: Number(r[3]), rec: JSON.parse(r[4]) });
+    });
+  }
+
+  const now = Date.now();
+  const fresh = [], bounced = [], changedSales = [];
+  const changedSessions = new Set(), sessionsToSum = new Set();
+  data.records.forEach(r => {
+    if (!r || typeof r.id !== 'string' || !TYPES[r.type]) return;
+    const cur = byId.get(r.id);
+    if (cur && cur.u > (r.u || 0)) { bounced.push(r.id); return; }   // stored copy is newer
+    const row = [r.id, r.type, String(r.u || 0), String(now), JSON.stringify(r)];
+    if (cur) db.getRange(cur.row, 1, 1, 5).setValues([row]);
+    else fresh.push(row);
+    byId.set(r.id, { row: cur ? cur.row : 0, u: r.u || 0, srv: now, rec: r });
+    if (r.type === 'sale') { changedSales.push(r); sessionsToSum.add(r.sessionId); }
+    if (r.type === 'session') { changedSessions.add(r.id); sessionsToSum.add(r.id); }
+  });
+  if (fresh.length) db.getRange(db.getLastRow() + 1, 1, fresh.length, 5).setValues(fresh);
+
+  // Refresh the human-friendly Sales / Sessions tabs for whatever changed.
+  const sessions = {}, allSales = [];
+  byId.forEach(v => {
+    if (v.rec.type === 'session') sessions[v.rec.id] = v.rec;
+    else if (v.rec.type === 'sale') allSales.push(v.rec);
+  });
+  const saleRows = [];
+  allSales.filter(s => changedSales.indexOf(s) >= 0 || changedSessions.has(s.sessionId)).forEach(s => {
+    const sess = sessions[s.sessionId] || {};
+    const at = new Date(s.at);
+    s.items.forEach((it, i) => {
+      saleRows.push([s.id + '-' + i, s.id,
+        Utilities.formatDate(at, tz, 'yyyy-MM-dd'), Utilities.formatDate(at, tz, 'h:mm a'),
+        sess.market || '', it.name, it.qty, it.price / 100, it.qty * it.price / 100, s.payment,
+        s.voided || sess.deleted ? 'yes' : '', s.sessionId]);
+    });
+  });
+  const sessionRows = [];
+  sessionsToSum.forEach(id => {
+    const sess = sessions[id];
+    if (!sess) return;
+    let count = 0, items = 0, revenue = 0, cash = 0;
+    allSales.forEach(s => {
+      if (s.sessionId !== id || s.voided) return;
+      count++; revenue += s.total;
+      if (s.payment === 'Cash') cash += s.total;
+      s.items.forEach(it => { items += it.qty; });
+    });
+    sessionRows.push([id, sess.market, new Date(sess.openedAt), sess.closedAt ? new Date(sess.closedAt) : '',
+      (sess.startCash || 0) / 100, count, items, revenue / 100, cash / 100, (revenue - cash) / 100, sess.deleted ? 'yes' : '']);
+  });
+  if (sessionRows.length) upsert(ss, 'Sessions', SESSION_HEADERS, sessionRows, [5, 8, 9, 10]);
+  if (saleRows.length) upsert(ss, 'Sales', SALES_HEADERS, saleRows, [8, 9]);
+
+  const since = Number(data.since || 0);
+  const records = [];
+  byId.forEach((v, id) => { if (v.srv > since || bounced.indexOf(id) >= 0) records.push(v.rec); });
+  return { ok: true, now: now, records: records };
+}
+
+// Pages from before two-way sync send ready-made rows instead of records.
+function legacySave(ss, tz, data) {
     const sessionRows = (data.sessions || []).map(s => {
       const cash = (s.byPayment && s.byPayment.Cash) || 0;
       return [s.id, s.market, new Date(s.openedAt), s.closedAt ? new Date(s.closedAt) : '',
@@ -93,12 +185,6 @@ function saveSales(data) {
 
     if (sessionRows.length) upsert(ss, 'Sessions', SESSION_HEADERS, sessionRows, [5, 8, 9, 10]);
     if (saleRows.length) upsert(ss, 'Sales', SALES_HEADERS, saleRows, [8, 9]);
-    return json({ ok: true });
-  } catch (err) {
-    return json({ ok: false, error: String(err) });
-  } finally {
-    lock.releaseLock();
-  }
 }
 
 function doGet() {
@@ -115,6 +201,7 @@ function upsert(ss, name, headers, rows, moneyCols) {
     sh.getRange(1, 1, 1, headers.length).setFontWeight('bold');
     moneyCols.forEach(c => sh.getRange(2, c, sh.getMaxRows() - 1, 1).setNumberFormat('$#,##0.00'));
   }
+  sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
   const last = sh.getLastRow();
   const keys = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues().map(r => String(r[0])) : [];
   const rowOf = new Map(keys.map((k, i) => [k, i + 2]));

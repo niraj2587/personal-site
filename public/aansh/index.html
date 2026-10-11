@@ -192,11 +192,12 @@
   // ---------- storage ----------
   const KEY = 'aansh-pos-v1';
   const DEFAULT_PRODUCTS = [
-    { name: 'Fridge Magnet',    price: 300, emoji: '🧲' },
-    { name: 'Bookmark',         price: 50,  emoji: '🔖' },
-    { name: 'Origami',          price: 25,  emoji: '🦢' },
-    { name: 'Small Trail Mix',  price: 300, emoji: '🥜' },
-    { name: 'Large Trail Mix',  price: 500, emoji: '🛍️' },
+    // Fixed ids so every phone shares the same starting products.
+    { id: 'p-magnet',   name: 'Fridge Magnet',    price: 300, emoji: '🧲' },
+    { id: 'p-bookmark', name: 'Bookmark',         price: 50,  emoji: '🔖' },
+    { id: 'p-origami',  name: 'Origami',          price: 25,  emoji: '🦢' },
+    { id: 'p-trail-s',  name: 'Small Trail Mix',  price: 300, emoji: '🥜' },
+    { id: 'p-trail-l',  name: 'Large Trail Mix',  price: 500, emoji: '🛍️' },
   ];
   const DEFAULT_PAYMENTS = ['Cash', 'Venmo', 'Zelle', 'Card'];
 
@@ -204,11 +205,13 @@
 
   function freshState() {
     return {
-      products: DEFAULT_PRODUCTS.map(p => ({ id: uid(), active: true, ...p })),
-      payments: DEFAULT_PAYMENTS.slice(),
-      sessions: [],   // {id, market, openedAt, closedAt, startCash, v, sv}
-      sales: [],      // {id, sessionId, at, items:[{productId,name,price,qty}], total, payment, cashGiven, voided, v, sv}
-      currentSessionId: null,
+      proto: 2,
+      products: DEFAULT_PRODUCTS.map(p => ({ active: true, ...p })),   // + deleted
+      cfg: { id: 'payments', list: DEFAULT_PAYMENTS.slice() },
+      sessions: [],   // {id, market, openedAt, closedAt, startCash, deleted}
+      sales: [],      // {id, sessionId, at, items:[{productId,name,price,qty}], total, payment, cashGiven, voided}
+      // Every record also has u (edited-at ms), v (local version), sv (version last sent to the server).
+      pulledAt: 0,    // server time of the last download
       syncUrl: '',
       token: '',      // device key from the server; preferred over password
       password: '',   // only kept if the server is too old to issue keys
@@ -220,9 +223,25 @@
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) return Object.assign(freshState(), JSON.parse(raw));
+      if (raw) {
+        const saved = JSON.parse(raw);
+        const st = Object.assign(freshState(), saved);
+        return saved.proto === 2 ? st : migrate(st);
+      }
     } catch (e) { console.warn('load failed', e); }
     return freshState();
+  }
+  // Phones from before two-way sync: give default products the shared ids and re-send everything.
+  function migrate(st) {
+    for (const d of DEFAULT_PRODUCTS) {
+      const p = st.products.find(p => p.name === d.name);
+      if (p) p.id = d.id;
+    }
+    st.cfg = { id: 'payments', list: st.payments || DEFAULT_PAYMENTS.slice() };
+    delete st.payments; delete st.currentSessionId;
+    for (const r of [...st.sessions, ...st.sales, ...st.products, st.cfg]) { r.v = r.v || 1; r.sv = 0; r.u = r.u || 1; }
+    st.proto = 2;
+    return st;
   }
   let S = load();
   function save() {
@@ -231,7 +250,7 @@
   }
 
   // Version counters so sync knows what changed: v = local version, sv = last synced version.
-  const touch = rec => { rec.v = (rec.v || 0) + 1; };
+  const touch = rec => { rec.v = (rec.v || 0) + 1; rec.u = Math.max(Date.now(), (rec.u || 0) + 1); };
   const dirty = rec => (rec.v || 0) !== (rec.sv || 0);
 
   // Store server (Apps Script web app). Encoded only to keep it out of plain sight;
@@ -261,8 +280,13 @@
     toastTimer = setTimeout(() => t.remove(), 2200);
   }
 
-  const currentSession = () => S.sessions.find(s => s.id === S.currentSessionId) || null;
-  const salesFor = sid => S.sales.filter(x => x.sessionId === sid);
+  const byTime = k => (a, b) => (a[k] < b[k] ? -1 : a[k] > b[k] ? 1 : 0);
+  const liveSessions = () => S.sessions.filter(s => !s.deleted).sort(byTime('openedAt'));
+  // The open market day is shared: whichever phone opened it, everyone sells into it.
+  const currentSession = () => liveSessions().filter(s => !s.closedAt).pop() || null;
+  const salesFor = sid => S.sales.filter(x => x.sessionId === sid).sort(byTime('at'));
+  const liveSales = () => { const ok = new Set(liveSessions().map(s => s.id)); return S.sales.filter(x => ok.has(x.sessionId)); };
+  const liveProducts = () => S.products.filter(p => !p.deleted);
 
   function summarize(sales) {
     const live = sales.filter(x => !x.voided);
@@ -330,7 +354,7 @@
   function renderSyncPill() {
     const pill = $('#syncPill');
     if (!unlocked()) return;
-    const pending = S.sales.filter(dirty).length + S.sessions.filter(dirty).length;
+    const pending = allRecords().filter(dirty).length;
     if (pending) { pill.textContent = `⏳ ${pending} to sync`; pill.className = 'sync-pill warn'; }
     else { pill.textContent = '☁️ Synced'; pill.className = 'sync-pill'; }
   }
@@ -366,7 +390,7 @@
   }
 
   function renderOpenStore() {
-    const lastMarket = S.sessions.length ? S.sessions[S.sessions.length - 1].market : '';
+    const lastMarket = liveSessions().length ? liveSessions().pop().market : '';
     view.innerHTML = `
       <div class="card" style="margin-top:20px;text-align:center">
         <div style="font-size:48px">🏪</div>
@@ -378,12 +402,16 @@
           <input id="startCash" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></label>
         <button class="btn primary block big" id="openBtn">Open store 🎉</button>
       </div>`;
-    $('#openBtn').onclick = () => {
+    $('#openBtn').onclick = async () => {
       const market = $('#mkt').value.trim() || 'Farmers Market';
-      const s = { id: uid(), market, openedAt: new Date().toISOString(), closedAt: null, startCash: toCents($('#startCash').value) };
+      const startCash = toCents($('#startCash').value);
+      // Another phone may have opened the store already; join it instead of starting a second day.
+      $('#openBtn').disabled = true;
+      await sync();
+      if (currentSession()) { toast('Joined the store opened on another phone 👋'); render(); return; }
+      const s = { id: uid(), market, openedAt: new Date().toISOString(), closedAt: null, startCash };
       touch(s);
       S.sessions.push(s);
-      S.currentSessionId = s.id;
       save(); sync();
       toast('Store is open — good luck! 🍀');
       render();
@@ -396,7 +424,7 @@
     const lines = cartLines();
     const total = cartTotal();
     const sum = summarize(salesFor(cs.id));
-    const active = S.products.filter(p => p.active);
+    const active = liveProducts().filter(p => p.active);
 
     view.innerHTML = `
       <div class="row" style="margin-top:14px;align-items:center">
@@ -430,7 +458,7 @@
 
         <h3>Paid with</h3>
         <div class="chips">
-          ${S.payments.map(m => `<button class="chip ${payment === m ? 'on' : ''}" data-pay="${esc(m)}">${esc(m)}</button>`).join('')}
+          ${S.cfg.list.map(m => `<button class="chip ${payment === m ? 'on' : ''}" data-pay="${esc(m)}">${esc(m)}</button>`).join('')}
         </div>
 
         <div class="${payment === 'Cash' ? '' : 'hidden'}">
@@ -491,7 +519,7 @@
       items: lines.map(l => ({ productId: l.productId, name: l.name, price: l.price, qty: l.qty })),
       total: cartTotal(), payment, cashGiven: payment === 'Cash' ? cashGiven : null, voided: false,
     };
-    touch(sale); touch(cs);
+    touch(sale);
     S.sales.push(sale);
     save();
     if (navigator.vibrate) navigator.vibrate(40);
@@ -506,8 +534,6 @@
     if (!s) return;
     s.voided = !s.voided;
     touch(s);
-    const sess = S.sessions.find(x => x.id === s.sessionId);
-    if (sess) touch(sess);
     save(); sync();
     toast(s.voided ? 'Sale removed' : 'Sale restored');
     render();
@@ -576,7 +602,7 @@
   function renderToday() {
     const cs = currentSession();
     if (!cs) {
-      const last = S.sessions[S.sessions.length - 1];
+      const last = liveSessions().pop();
       if (!last) { view.innerHTML = '<p class="empty">No market days yet.<br>Open the store from the Sell tab.</p>'; return; }
       view.innerHTML = `<p class="muted" style="margin-top:16px">Store is closed. Here's the last market day:</p>` + sessionReport(last, { showClose: false });
       bindReport();
@@ -589,7 +615,6 @@
       if (!confirm(`Close the store?\n\nYou earned ${money2(sum.revenue)} from ${sum.count} sales today. 🎉`)) return;
       cs.closedAt = new Date().toISOString();
       touch(cs);
-      S.currentSessionId = null;
       clearCart();
       save(); sync();
       toast(`Great job! ${money2(sum.revenue)} today 🎉`);
@@ -599,34 +624,34 @@
 
   function renderHistory() {
     if (viewingSessionId) {
-      const sess = S.sessions.find(s => s.id === viewingSessionId);
+      const sess = liveSessions().find(s => s.id === viewingSessionId);
       if (sess) {
         view.innerHTML = `<button class="btn ghost" id="backBtn" style="margin-top:14px">← All market days</button>` +
           sessionReport(sess, { showClose: false }) +
-          (sess.id !== S.currentSessionId ? `<button class="btn ghost block" id="delSess" style="margin-bottom:20px">Delete this market day</button>` : '');
+          (sess.closedAt ? `<button class="btn ghost block" id="delSess" style="margin-bottom:20px">Delete this market day</button>` : '');
         bindReport();
         $('#backBtn').onclick = () => { viewingSessionId = null; render(); };
         const del = $('#delSess');
         if (del) del.onclick = () => {
-          if (!confirm('Delete this whole market day from the phone? (It stays in the Google Sheet if synced.)')) return;
-          S.sales = S.sales.filter(x => x.sessionId !== sess.id);
-          S.sessions = S.sessions.filter(x => x.id !== sess.id);
-          viewingSessionId = null; save(); render();
+          if (!confirm('Delete this whole market day on every phone? (The Google Sheet keeps it, marked Deleted.)')) return;
+          sess.deleted = true; touch(sess);
+          viewingSessionId = null; save(); sync(); render();
         };
         return;
       }
       viewingSessionId = null;
     }
 
-    const all = summarize(S.sales);
-    const sessions = S.sessions.slice().reverse();
+    const all = summarize(liveSales());
+    const sessions = liveSessions().reverse();
+    const open = currentSession();
     const best = Object.entries(all.byProduct).sort((a, b) => b[1].qty - a[1].qty)[0];
     view.innerHTML = `
       <h2>All-time</h2>
       <div class="stats">
-        <div class="stat hero"><b>${money2(all.revenue)}</b><span>earned across ${S.sessions.length} market day${S.sessions.length === 1 ? '' : 's'}</span></div>
+        <div class="stat hero"><b>${money2(all.revenue)}</b><span>earned across ${sessions.length} market day${sessions.length === 1 ? '' : 's'}</span></div>
         <div class="stat"><b>${all.items}</b><span>items sold</span></div>
-        <div class="stat"><b>${S.sessions.length ? money2(Math.round(all.revenue / S.sessions.length)) : '–'}</b><span>per day</span></div>
+        <div class="stat"><b>${sessions.length ? money2(Math.round(all.revenue / sessions.length)) : '–'}</b><span>per day</span></div>
         <div class="stat"><b style="font-size:16px">${best ? esc(best[0]) : '–'}</b><span>best seller</span></div>
       </div>
       ${Object.keys(all.byProduct).length ? `
@@ -643,13 +668,13 @@
         ${sessions.length ? sessions.map(s => {
           const sm = summarize(salesFor(s.id));
           return `<button class="session-row" data-sess="${s.id}">
-            <span class="body"><b>${esc(s.market)}</b>${s.id === S.currentSessionId ? ' <small style="color:var(--green)">● open</small>' : ''}<br>
+            <span class="body"><b>${esc(s.market)}</b>${open && s.id === open.id ? ' <small style="color:var(--green)">● open</small>' : ''}<br>
               <small class="muted">${fmtDate(s.openedAt)} · ${sm.count} sales · ${sm.items} items</small></span>
             <b>${money2(sm.revenue)}</b><span class="muted">›</span>
           </button>`;
         }).join('') : '<p class="empty">No market days yet.</p>'}
       </div>
-      ${S.sales.length ? '<button class="btn ghost block" id="csvBtn" style="margin:8px 0 20px">⬇️ Download all sales (CSV)</button>' : ''}
+      ${liveSales().length ? '<button class="btn ghost block" id="csvBtn" style="margin:8px 0 20px">⬇️ Download all sales (CSV)</button>' : ''}
     `;
     view.querySelectorAll('[data-sess]').forEach(b => b.onclick = () => { viewingSessionId = b.dataset.sess; render(); window.scrollTo(0, 0); });
     const csv = $('#csvBtn'); if (csv) csv.onclick = exportCsv;
@@ -658,9 +683,9 @@
   function renderSettings() {
     view.innerHTML = `
       <h2>Products</h2>
-      <p class="muted" style="margin-top:-6px">Change names, prices and emojis. Untick “Show” to hide an item without losing its history.</p>
+      <p class="muted" style="margin-top:-6px">Change names, prices and emojis — every phone gets the update. Untick “Show” to hide an item without losing its history.</p>
       <div class="card" id="prodList">
-        ${S.products.map(p => `
+        ${liveProducts().map(p => `
           <div class="prod-edit" data-pid="${p.id}">
             <input type="text" data-f="emoji" value="${esc(p.emoji)}" style="text-align:center;font-size:22px" aria-label="Emoji">
             <input type="text" data-f="name" value="${esc(p.name)}" aria-label="Name">
@@ -677,14 +702,14 @@
       <h2>Payment types</h2>
       <div class="card">
         <label class="field" style="margin-top:0"><span>Separate with commas</span>
-          <input type="text" id="payList" value="${esc(S.payments.join(', '))}"></label>
+          <input type="text" id="payList" value="${esc(S.cfg.list.join(', '))}"></label>
       </div>
 
-      <h2>Google Sheet backup</h2>
+      <h2>Sync</h2>
       <div class="card">
-        <p class="muted" style="margin-top:0">Every sale is saved on this phone and sent to the Google Sheet.${S.lastSyncAt ? `<br>Last synced ${fmtDate(S.lastSyncAt)} ${fmtTime(S.lastSyncAt)}.` : ''}${S.lastSyncError ? `<br><span style="color:var(--red)">Last error: ${esc(S.lastSyncError)}</span>` : ''}</p>
+        <p class="muted" style="margin-top:0">Sales are saved on this phone first, then shared with every logged-in phone and the Google Sheet.${S.lastSyncAt ? `<br>Last synced ${fmtDate(S.lastSyncAt)} ${fmtTime(S.lastSyncAt)}.` : ''}${S.lastSyncError ? `<br><span style="color:var(--red)">Last error: ${esc(S.lastSyncError)}</span>` : ''}</p>
         <button class="btn primary block" id="syncNow">Sync now</button>
-        <button class="linkish" id="resyncAll" style="margin-top:10px;color:var(--muted)">Re-send everything to the sheet</button>
+        <button class="linkish" id="resyncAll" style="margin-top:10px;color:var(--muted)">Re-send and re-download everything</button>
       </div>
 
       <h2>Data</h2>
@@ -694,7 +719,7 @@
           <button class="btn ghost" id="backup">💾 Full backup</button>
         </div>
         <button class="btn ghost block" id="lockNow" style="margin-top:12px">🔒 Lock this phone (log out)</button>
-        <button class="btn danger block" id="wipe" style="margin-top:12px">Erase everything on this phone</button>
+        <button class="btn danger block" id="wipe" style="margin-top:12px">Reset this phone (reloads from the sheet)</button>
       </div>
       <p class="muted" style="text-align:center;font-size:13px;margin-bottom:24px">Tip: “Add to Home Screen” from your browser’s share menu to use this like an app.</p>
     `;
@@ -706,43 +731,47 @@
         if (f === 'price') p.price = toCents(inp.value);
         else if (f === 'active') p.active = inp.checked;
         else p[f] = inp.value.trim();
-        save(); toast('Saved');
+        touch(p); save(); sync(); toast('Saved');
       });
     });
     view.querySelectorAll('[data-delp]').forEach(b => b.onclick = () => {
       const p = S.products.find(x => x.id === b.dataset.delp);
-      if (!confirm(`Delete “${p.name}”? Past sales keep their record.`)) return;
-      S.products = S.products.filter(x => x !== p);
+      if (!confirm(`Delete “${p.name}” on every phone? Past sales keep their record.`)) return;
+      p.deleted = true; touch(p);
       delete cart[p.id];
-      save(); render();
+      save(); sync(); render();
     });
     $('#addProd').onclick = () => {
-      S.products.push({ id: uid(), name: 'New item', price: 100, emoji: '⭐', active: true });
-      save(); render();
+      const p = { id: uid(), name: 'New item', price: 100, emoji: '⭐', active: true };
+      touch(p);
+      S.products.push(p);
+      save(); sync(); render();
       const inputs = view.querySelectorAll('.prod-edit:last-of-type input[data-f=name]');
       if (inputs.length) { inputs[0].focus(); inputs[0].select(); }
     };
     $('#payList').onchange = e => {
       const list = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-      S.payments = list.length ? list : DEFAULT_PAYMENTS.slice();
-      save(); toast('Saved');
+      S.cfg.list = list.length ? list : DEFAULT_PAYMENTS.slice();
+      touch(S.cfg); save(); sync(); toast('Saved');
     };
     $('#syncNow').onclick = () => sync(true);
     $('#resyncAll').onclick = () => {
-      S.sales.forEach(x => x.sv = 0); S.sessions.forEach(x => x.sv = 0);
+      allRecords().forEach(r => { r.sv = 0; r.u = r.u || 1; });
+      S.pulledAt = 0;
       save(); sync(true);
     };
     $('#csv2').onclick = exportCsv;
     $('#backup').onclick = () => download(`aansh-pos-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(S, null, 2), 'application/json');
     $('#lockNow').onclick = () => {
-      if (S.sales.some(dirty) || S.sessions.some(dirty)) return toast('Sync first — some sales are not in the sheet yet');
+      if (allRecords().some(dirty)) return toast('Sync first — some changes are not in the sheet yet');
       if (!confirm('Lock the app? You will need the password to get back in.')) return;
       signOut(); render();
     };
     $('#wipe').onclick = () => {
-      if (!confirm('Erase ALL products, market days and sales from this phone? This cannot be undone.')) return;
-      if (prompt('Type ERASE to confirm') !== 'ERASE') return;
-      S = Object.assign(freshState(), { syncUrl: S.syncUrl, token: S.token, password: S.password }); clearCart(); save(); tab = 'sell'; render();
+      const unsent = allRecords().filter(dirty).length;
+      if (!confirm(`Clear this phone's copy and download everything again from the sheet?${unsent ? `\n\n⚠️ ${unsent} change(s) have NOT synced yet and will be lost.` : ''}`)) return;
+      if (unsent && prompt('Type RESET to confirm') !== 'RESET') return;
+      S = Object.assign(freshState(), { syncUrl: S.syncUrl, token: S.token, password: S.password }); clearCart(); save(); tab = 'sell'; render(); sync(true);
     };
   }
 
@@ -757,7 +786,7 @@
   function exportCsv() {
     const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows = [['Date', 'Time', 'Market', 'Sale ID', 'Item', 'Qty', 'Unit Price', 'Line Total', 'Payment', 'Removed']];
-    for (const s of S.sales) {
+    for (const s of liveSales().sort(byTime('at'))) {
       const sess = S.sessions.find(x => x.id === s.sessionId);
       for (const i of s.items) {
         rows.push([new Date(s.at).toLocaleDateString(), fmtTime(s.at), sess ? sess.market : '', s.id, i.name, i.qty,
@@ -768,17 +797,48 @@
   }
 
   // ---------- Google Sheet sync ----------
+  const allRecords = () => [...S.sessions, ...S.sales, ...S.products, S.cfg];
+  const strip = ({ v, sv, ...rest }) => rest;
+
+  // Apply records downloaded from the server. Newest edit wins. Records are
+  // updated in place so screens holding a reference keep seeing fresh data.
+  function merge(records) {
+    let changed = false;
+    for (const { type, ...rec } of records) {
+      if (type === 'config') {
+        if (rec.id === 'payments' && (rec.u || 0) > (S.cfg.u || 0) && !dirty(S.cfg)) { Object.assign(S.cfg, rec, { v: 1, sv: 1 }); changed = true; }
+        continue;
+      }
+      const list = { session: S.sessions, sale: S.sales, product: S.products }[type];
+      if (!list || !rec.id) continue;
+      const local = list.find(x => x.id === rec.id);
+      if (local && (local.u || 0) >= (rec.u || 0)) continue;
+      if (local) {
+        Object.keys(local).forEach(k => delete local[k]);
+        Object.assign(local, rec, { v: 1, sv: 1 });
+      } else list.push({ ...rec, v: 1, sv: 1 });
+      changed = true;
+    }
+    return changed;
+  }
+
   let syncing = false;
   async function sync(manual = false) {
     if (!unlocked() || syncing) return;
-    const sessions = S.sessions.filter(dirty);
-    const sales = S.sales.filter(dirty);
-    if (!sessions.length && !sales.length) { if (manual) toast('☁️ Already up to date'); renderSyncPill(); return; }
     if (!navigator.onLine) { if (manual) toast('No internet — will sync later'); return; }
 
     syncing = true;
-    const sentV = new Map([...sessions, ...sales].map(r => [r.id, r.v]));
+    const pending = [['session', S.sessions], ['sale', S.sales], ['product', S.products], ['config', [S.cfg]]]
+      .flatMap(([type, list]) => list.filter(dirty).map(r => ({ type, r })));
+    const sentV = new Map(pending.map(({ r }) => [r, r.v]));
+    const sessions = pending.filter(p => p.type === 'session').map(p => p.r);
+    const sales = pending.filter(p => p.type === 'sale').map(p => p.r);
+    let changed = false;
+    // Old servers read `sessions`/`sales`; new ones read `records` and reply with other phones' changes.
     const payload = {
+      action: 'sync',
+      since: S.pulledAt || 0,
+      records: pending.map(({ type, r }) => ({ type, ...strip(r) })),
       sessions: sessions.map(s => {
         const sm = summarize(salesFor(s.id));
         return { id: s.id, market: s.market, openedAt: s.openedAt, closedAt: s.closedAt, startCash: (s.startCash || 0) / 100,
@@ -796,10 +856,11 @@
       const out = await post({ ...auth(), ...payload });
       if (out.error === 'unauthorized') { signOut(); toast('🔒 Please unlock again'); return; }
       if (!out.ok) throw new Error(out.error || 'Sheet said no');
-      for (const r of [...S.sessions, ...S.sales]) if (sentV.has(r.id)) r.sv = sentV.get(r.id);
+      sentV.forEach((v, r) => { r.sv = v; });
+      if (Array.isArray(out.records)) { changed = merge(out.records); S.pulledAt = out.now; }
       S.lastSyncAt = new Date().toISOString();
       S.lastSyncError = null;
-      if (manual) toast('☁️ Synced to Google Sheet');
+      if (manual) toast('☁️ Synced');
     } catch (e) {
       S.lastSyncError = String(e.message || e);
       if (manual) toast('⚠️ Sync failed — saved on phone, will retry');
@@ -807,7 +868,9 @@
       syncing = false;
       save();
       renderSyncPill();
-      if (tab === 'settings' || !unlocked()) render();
+      // Don't redraw under someone typing in Settings.
+      const typing = view.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName);
+      if (!unlocked() || ((changed || tab === 'settings') && !typing)) render();
     }
   }
   // Phones logged in before device keys existed: swap the saved password for a key.
@@ -822,7 +885,7 @@
   }
 
   window.addEventListener('online', () => sync());
-  setInterval(() => sync(), 60000);
+  setInterval(() => { if (!document.hidden) sync(); }, 30000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
 
   // ---------- boot ----------
