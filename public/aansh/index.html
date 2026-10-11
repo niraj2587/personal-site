@@ -417,7 +417,9 @@
       try {
         const out = await post({ action: 'login', password: pw });
         if (out.ok) { signIn(out, pw); toast('🔓 Welcome, Aansh!'); render(); sync(); return; }
-        msg.textContent = out.error === 'locked' ? 'Too many wrong tries. Wait 15 minutes.' : 'Wrong password.';
+        msg.textContent = out.error === 'locked' ? 'Too many wrong tries. Wait 15 minutes.'
+          : out.error === 'not set up' ? 'The store password isn’t set up yet. Ask Niraj.'
+          : 'Wrong password.';
       } catch (e) {
         msg.textContent = 'Could not reach the store. Check your internet.';
       }

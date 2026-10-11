@@ -3,8 +3,12 @@
  *
  * Setup:
  *   1. Create a Google Sheet (e.g. "Aansh Creations Sales").
- *   2. Extensions → Apps Script. Delete the sample code, paste this file in.
- *   3. Change PASSWORD below to the store password, then Save.
+ *   2. Extensions → Apps Script. Delete the sample code, paste this file in, Save.
+ *   3. ⚙️ Project Settings → Script Properties → Add script property:
+ *        Property: STORE_PASSWORD    Value: the store password
+ *      The password is kept there, never in this code, so pasting a new
+ *      version of this file can't reset it. If it's missing, all password
+ *      logins are refused (phones already logged in keep working).
  *   4. Deploy → New deployment → type "Web app"
  *        Execute as: Me
  *        Who has access: Anyone
@@ -23,8 +27,6 @@
  * If you edit this script later: Deploy → Manage deployments → ✏️ → Version:
  * "New version" → Deploy. That keeps the same URL.
  */
-
-const PASSWORD = 'change-me';
 
 const SALES_HEADERS = ['Line ID', 'Sale ID', 'Date', 'Time', 'Market', 'Item', 'Qty', 'Unit Price', 'Line Total', 'Payment', 'Removed', 'Session ID'];
 const SESSION_HEADERS = ['Session ID', 'Market', 'Opened', 'Closed', 'Starting Cash', 'Sales', 'Items Sold', 'Revenue', 'Cash', 'Non-cash', 'Deleted'];
@@ -48,7 +50,9 @@ function doPost(e) {
   const cache = CacheService.getScriptCache();
   const fails = Number(cache.get('fails') || 0);
   if (fails >= 10) return json({ ok: false, error: 'locked' });
-  if (data.password !== PASSWORD) {
+  const password = props.getProperty('STORE_PASSWORD') || '';
+  if (password.length < 8) return json({ ok: false, error: 'not set up' });   // refuse rather than accept a blank/weak one
+  if (typeof data.password !== 'string' || data.password !== password) {
     cache.put('fails', String(fails + 1), 15 * 60);
     return json({ ok: false, error: 'unauthorized' });
   }
