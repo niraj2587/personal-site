@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#2f6b3a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Aansh POS">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌾</text></svg>">
+<title>Aansh Creations POS</title>
+<style>
+  :root {
+    --bg: #f7f3ea;
+    --card: #ffffff;
+    --ink: #1f2a1f;
+    --muted: #6b6f63;
+    --line: #e4dccb;
+    --green: #2f6b3a;
+    --green-soft: #e3efe2;
+    --amber: #c9761b;
+    --amber-soft: #fbecd7;
+    --red: #b3372b;
+    --red-soft: #f8e1de;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+    min-height: 100vh;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: none; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 0 16px; }
+
+  header.top {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--green); color: #fff;
+    padding: calc(10px + env(safe-area-inset-top)) 0 10px;
+  }
+  header.top .wrap { display: flex; align-items: center; gap: 10px; }
+  header.top h1 { font-size: 18px; margin: 0; flex: 1; letter-spacing: .2px; }
+  header.top h1 small { display: block; font-size: 12px; font-weight: 500; opacity: .85; }
+  .sync-pill {
+    font-size: 12px; padding: 4px 10px; border-radius: 99px;
+    background: rgba(255,255,255,.18); color: #fff; white-space: nowrap;
+  }
+  .sync-pill.warn { background: #f1c27d; color: #3d2a0a; }
+
+  h2 { font-size: 20px; margin: 20px 0 10px; }
+  h3 { font-size: 15px; margin: 18px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .muted { color: var(--muted); }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px; margin: 12px 0;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 48px; padding: 0 18px; border-radius: 12px;
+    font-weight: 600; background: var(--green-soft); color: var(--green);
+  }
+  .btn.primary { background: var(--green); color: #fff; }
+  .btn.danger { background: var(--red-soft); color: var(--red); }
+  .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+  .btn.block { width: 100%; }
+  .btn.big { min-height: 60px; font-size: 19px; }
+  .btn:disabled { opacity: .4; cursor: default; }
+
+  label.field { display: block; margin: 10px 0; }
+  label.field span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=number], input[type=url], input[type=password], select {
+    width: 100%; min-height: 48px; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 12px; background: #fff;
+  }
+
+  /* Sell grid */
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+  .prod {
+    position: relative; background: var(--card); border: 2px solid var(--line);
+    border-radius: var(--radius); padding: 14px 10px; min-height: 112px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    text-align: center; transition: transform .06s;
+  }
+  .prod:active { transform: scale(.97); }
+  .prod .emo { font-size: 34px; line-height: 1; }
+  .prod .nm { font-weight: 600; font-size: 15px; }
+  .prod .pr { color: var(--green); font-weight: 700; }
+  .prod.in-cart { border-color: var(--green); background: var(--green-soft); }
+  .prod .badge {
+    position: absolute; top: 8px; right: 8px; min-width: 28px; height: 28px; padding: 0 6px;
+    border-radius: 99px; background: var(--green); color: #fff; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+
+  .cart-line { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .cart-line:last-child { border-bottom: 0; }
+  .cart-line .nm { flex: 1; }
+  .qty { display: flex; align-items: center; gap: 4px; }
+  .qty button { width: 38px; height: 38px; border-radius: 10px; background: var(--green-soft); color: var(--green); font-size: 20px; font-weight: 700; }
+  .qty b { min-width: 24px; text-align: center; }
+  .total-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 22px; font-weight: 800; margin-top: 10px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    min-height: 44px; padding: 0 16px; border-radius: 99px; border: 2px solid var(--line);
+    background: #fff; font-weight: 600;
+  }
+  .chip.on { border-color: var(--green); background: var(--green); color: #fff; }
+  .change-due { margin-top: 10px; padding: 12px; border-radius: 12px; background: var(--amber-soft); color: #6a3d06; font-weight: 700; font-size: 18px; text-align: center; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 10px; text-align: center; }
+  .stat b { display: block; font-size: 22px; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .stat.hero { grid-column: 1 / -1; background: var(--green); color: #fff; border: 0; }
+  .stat.hero b { font-size: 36px; }
+  .stat.hero span { color: rgba(255,255,255,.85); }
+
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 8px 4px; border-bottom: 1px solid var(--line); text-align: left; font-size: 15px; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+  td.r, th.r { text-align: right; }
+
+  .sale { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .sale:last-child { border-bottom: 0; }
+  .sale .body { flex: 1; min-width: 0; }
+  .sale .amt { font-weight: 700; white-space: nowrap; }
+  .sale.void .body, .sale.void .amt { text-decoration: line-through; opacity: .5; }
+  .sale small { color: var(--muted); }
+  .linkish { color: var(--red); font-size: 13px; font-weight: 600; padding: 4px 0; }
+
+  .session-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .session-row:last-child { border-bottom: 0; }
+  .session-row .body { flex: 1; }
+
+  .prod-edit { display: grid; grid-template-columns: 56px 1fr 90px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .prod-edit input { min-height: 44px; }
+  .prod-edit .row2 { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; font-size: 14px; }
+  .prod-edit .row2 label { display: flex; gap: 6px; align-items: center; }
+
+  nav.tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    background: #fff; border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  nav.tabs .wrap { display: grid; grid-template-columns: repeat(4, 1fr); padding: 0; }
+  nav.tabs button { min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  nav.tabs button .ic { font-size: 22px; line-height: 1; }
+  nav.tabs button.on { color: var(--green); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 12px; font-weight: 600;
+    z-index: 20; max-width: calc(100% - 32px); text-align: center;
+    animation: pop .2s ease-out;
+  }
+  @keyframes pop { from { opacity: 0; transform: translate(-50%, 10px); } }
+  .empty { text-align: center; padding: 28px 10px; color: var(--muted); }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1>🌾 Aansh Creations <small id="hdrSub">Point of Sale</small></h1>
+    <span id="syncPill" class="sync-pill"></span>
+  </div>
+</header>
+
+<main class="wrap" id="view"></main>
+
+<nav class="tabs">
+  <div class="wrap">
+    <button data-tab="sell"><span class="ic">🛒</span>Sell</button>
+    <button data-tab="today"><span class="ic">📊</span>Today</button>
+    <button data-tab="history"><span class="ic">📅</span>History</button>
+    <button data-tab="settings"><span class="ic">⚙️</span>Settings</button>
+  </div>
+</nav>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- storage ----------
+  const KEY = 'aansh-pos-v1';
+  const DEFAULT_PRODUCTS = [
+    { name: 'Fridge Magnet',    price: 300, emoji: '🧲' },
+    { name: 'Bookmark',         price: 50,  emoji: '🔖' },
+    { name: 'Origami',          price: 25,  emoji: '🦢' },
+    { name: 'Small Trail Mix',  price: 300, emoji: '🥜' },
+    { name: 'Large Trail Mix',  price: 500, emoji: '🛍️' },
+  ];
+  const DEFAULT_PAYMENTS = ['Cash', 'Venmo', 'Zelle', 'Card'];
+
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  function freshState() {
+    return {
+      products: DEFAULT_PRODUCTS.map(p => ({ id: uid(), active: true, ...p })),
+      payments: DEFAULT_PAYMENTS.slice(),
+      sessions: [],   // {id, market, openedAt, closedAt, startCash, v, sv}
+      sales: [],      // {id, sessionId, at, items:[{productId,name,price,qty}], total, payment, cashGiven, voided, v, sv}
+      currentSessionId: null,
+      syncUrl: '',
+      password: '',
+      lastSyncAt: null,
+      lastSyncError: null,
+    };
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) return Object.assign(freshState(), JSON.parse(raw));
+    } catch (e) { console.warn('load failed', e); }
+    return freshState();
+  }
+  let S = load();
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(S)); }
+    catch (e) { toast('⚠️ Could not save on this phone!'); }
+  }
+
+  // Version counters so sync knows what changed: v = local version, sv = last synced version.
+  const touch = rec => { rec.v = (rec.v || 0) + 1; };
+  const dirty = rec => (rec.v || 0) !== (rec.sv || 0);
+
+  // One-time setup link: nirajjd.com/aansh/#sync=<apps script url>
+  (function readSetupHash() {
+    const m = location.hash.match(/sync=([^&]+)/);
+    if (m) {
+      S.syncUrl = decodeURIComponent(m[1]);
+      save();
+      history.replaceState(null, '', location.pathname);
+    }
+  })();
+
+  // ---------- helpers ----------
+  const $ = (sel, el = document) => el.querySelector(sel);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const money = c => (c < 0 ? '-' : '') + '$' + (Math.abs(c) / 100).toFixed(2).replace(/\.00$/, '');
+  const money2 = c => (c < 0 ? '-' : '') + '$' + (Math.abs(c) / 100).toFixed(2);
+  const toCents = v => Math.round(parseFloat(String(v).replace(/[^0-9.]/g, '')) * 100) || 0;
+  const fmtDate = iso => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  const fmtTime = iso => new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const fmtDur = (a, b) => {
+    const m = Math.round((new Date(b) - new Date(a)) / 60000);
+    return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`;
+  };
+
+  let toastTimer;
+  function toast(msg) {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const t = document.createElement('div');
+    t.className = 'toast'; t.textContent = msg;
+    document.body.appendChild(t);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.remove(), 2200);
+  }
+
+  const currentSession = () => S.sessions.find(s => s.id === S.currentSessionId) || null;
+  const salesFor = sid => S.sales.filter(x => x.sessionId === sid);
+
+  function summarize(sales) {
+    const live = sales.filter(x => !x.voided);
+    const byProduct = {}, byPayment = {};
+    let revenue = 0, items = 0;
+    for (const s of live) {
+      revenue += s.total;
+      byPayment[s.payment] = (byPayment[s.payment] || 0) + s.total;
+      for (const it of s.items) {
+        items += it.qty;
+        const k = it.name;
+        byProduct[k] = byProduct[k] || { qty: 0, total: 0 };
+        byProduct[k].qty += it.qty;
+        byProduct[k].total += it.qty * it.price;
+      }
+    }
+    return { revenue, items, count: live.length, byProduct, byPayment };
+  }
+
+  // ---------- UI state ----------
+  let tab = 'sell';
+  let cart = {};          // productId -> qty  (custom lines use key "custom:<id>")
+  let customLines = {};   // key -> {name, price}
+  let payment = null;
+  let cashGiven = null;
+  let viewingSessionId = null;
+
+  function cartLines() {
+    return Object.entries(cart).filter(([, q]) => q > 0).map(([k, qty]) => {
+      if (k.startsWith('custom:')) return { productId: k, ...customLines[k], qty };
+      const p = S.products.find(p => p.id === k);
+      return p ? { productId: p.id, name: p.name, price: p.price, qty } : null;
+    }).filter(Boolean);
+  }
+  const cartTotal = () => cartLines().reduce((a, l) => a + l.price * l.qty, 0);
+  function clearCart() { cart = {}; customLines = {}; payment = null; cashGiven = null; }
+
+  // ---------- render ----------
+  const view = $('#view');
+
+  const unlocked = () => !!(S.syncUrl && S.password);
+
+  function render() {
+    document.querySelector('nav.tabs').classList.toggle('hidden', !unlocked());
+    if (!unlocked()) { $('#hdrSub').textContent = 'Private'; $('#syncPill').className = 'hidden'; return renderLock(); }
+    document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+    const cs = currentSession();
+    $('#hdrSub').textContent = cs ? `Open · ${cs.market}` : 'Store closed';
+    renderSyncPill();
+    ({ sell: renderSell, today: renderToday, history: renderHistory, settings: renderSettings })[tab]();
+  }
+
+  function renderSyncPill() {
+    const pill = $('#syncPill');
+    if (!unlocked()) return;
+    const pending = S.sales.filter(dirty).length + S.sessions.filter(dirty).length;
+    if (pending) { pill.textContent = `⏳ ${pending} to sync`; pill.className = 'sync-pill warn'; }
+    else { pill.textContent = '☁️ Synced'; pill.className = 'sync-pill'; }
+  }
+
+  function renderLock() {
+    view.innerHTML = `
+      <div class="card" style="margin-top:28px;text-align:center">
+        <div style="font-size:48px">🔒</div>
+        <h2 style="margin-top:6px">This store is private</h2>
+        <p class="muted">Enter the store password to start selling.</p>
+        <label class="field ${S.syncUrl ? 'hidden' : ''}" style="text-align:left"><span>Setup link (ask Niraj)</span>
+          <input id="lockUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec"></label>
+        <label class="field" style="text-align:left"><span>Password</span>
+          <input id="lockPw" type="password" autocomplete="current-password"></label>
+        <button class="btn primary block big" id="lockBtn">Unlock</button>
+        <p id="lockMsg" class="muted" style="min-height:1.4em"></p>
+      </div>`;
+    const go = async () => {
+      const url = S.syncUrl || $('#lockUrl').value.trim();
+      const pw = $('#lockPw').value;
+      const msg = $('#lockMsg');
+      if (!url) { msg.textContent = 'Ask Niraj for the setup link.'; return; }
+      if (!pw) return;
+      $('#lockBtn').disabled = true; msg.textContent = 'Checking…';
+      try {
+        const res = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'login', password: pw }), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+        const out = await res.json();
+        if (out.ok) { S.syncUrl = url; S.password = pw; save(); toast('🔓 Welcome, Aansh!'); render(); sync(); return; }
+        msg.textContent = out.error === 'locked' ? 'Too many wrong tries. Wait 15 minutes.' : 'Wrong password.';
+      } catch (e) {
+        msg.textContent = 'Could not reach the store server. Check internet or the setup link.';
+      }
+      $('#lockBtn').disabled = false;
+    };
+    $('#lockBtn').onclick = go;
+    $('#lockPw').onkeydown = e => { if (e.key === 'Enter') go(); };
+  }
+
+  function renderOpenStore() {
+    const lastMarket = S.sessions.length ? S.sessions[S.sessions.length - 1].market : '';
+    view.innerHTML = `
+      <div class="card" style="margin-top:20px;text-align:center">
+        <div style="font-size:48px">🏪</div>
+        <h2 style="margin-top:6px">Open the store</h2>
+        <p class="muted">Start a new market day to begin selling.</p>
+        <label class="field" style="text-align:left"><span>Market / location</span>
+          <input id="mkt" type="text" placeholder="e.g. Saturday Farmers Market" value="${esc(lastMarket)}"></label>
+        <label class="field" style="text-align:left"><span>Starting cash in the box (optional)</span>
+          <input id="startCash" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00"></label>
+        <button class="btn primary block big" id="openBtn">Open store 🎉</button>
+      </div>`;
+    $('#openBtn').onclick = () => {
+      const market = $('#mkt').value.trim() || 'Farmers Market';
+      const s = { id: uid(), market, openedAt: new Date().toISOString(), closedAt: null, startCash: toCents($('#startCash').value) };
+      touch(s);
+      S.sessions.push(s);
+      S.currentSessionId = s.id;
+      save(); sync();
+      toast('Store is open — good luck! 🍀');
+      render();
+    };
+  }
+
+  function renderSell() {
+    const cs = currentSession();
+    if (!cs) return renderOpenStore();
+    const lines = cartLines();
+    const total = cartTotal();
+    const sum = summarize(salesFor(cs.id));
+    const active = S.products.filter(p => p.active);
+
+    view.innerHTML = `
+      <div class="row" style="margin-top:14px;align-items:center">
+        <div><b style="font-size:18px">${money2(sum.revenue)}</b> <span class="muted">today · ${sum.count} sale${sum.count === 1 ? '' : 's'}</span></div>
+        <button class="btn ghost" id="undoBtn" style="flex:0 0 auto" ${sum.count ? '' : 'disabled'}>↩︎ Undo last</button>
+      </div>
+      <div class="grid">
+        ${active.map(p => `
+          <button class="prod ${cart[p.id] ? 'in-cart' : ''}" data-add="${p.id}">
+            ${cart[p.id] ? `<span class="badge">${cart[p.id]}</span>` : ''}
+            <span class="emo">${esc(p.emoji || '📦')}</span>
+            <span class="nm">${esc(p.name)}</span>
+            <span class="pr">${money(p.price)}</span>
+          </button>`).join('')}
+        <button class="prod" id="customBtn">
+          <span class="emo">✏️</span><span class="nm">Custom amount</span><span class="pr muted">deal / tip</span>
+        </button>
+      </div>
+
+      <div class="card ${lines.length ? '' : 'hidden'}" id="cartCard">
+        <h3 style="margin-top:0">Current sale</h3>
+        ${lines.map(l => `
+          <div class="cart-line">
+            <span class="nm">${esc(l.name)}<br><small class="muted">${money2(l.price)} each</small></span>
+            <span class="qty">
+              <button data-dec="${l.productId}">−</button><b>${l.qty}</b><button data-inc="${l.productId}">+</button>
+            </span>
+            <b style="min-width:64px;text-align:right">${money2(l.price * l.qty)}</b>
+          </div>`).join('')}
+        <div class="total-row"><span>Total</span><span>${money2(total)}</span></div>
+
+        <h3>Paid with</h3>
+        <div class="chips">
+          ${S.payments.map(m => `<button class="chip ${payment === m ? 'on' : ''}" data-pay="${esc(m)}">${esc(m)}</button>`).join('')}
+        </div>
+
+        <div class="${payment === 'Cash' ? '' : 'hidden'}">
+          <h3>Cash received <span style="text-transform:none;font-weight:400">(optional — shows change)</span></h3>
+          <div class="chips">
+            ${[total, 100, 500, 1000, 2000].filter((v, i, a) => (i === 0 || v > total) && a.indexOf(v) === i)
+              .map(v => `<button class="chip ${cashGiven === v ? 'on' : ''}" data-cash="${v}">${v === total ? 'Exact' : money(v)}</button>`).join('')}
+          </div>
+          ${cashGiven != null && cashGiven > total ? `<div class="change-due">Give back ${money2(cashGiven - total)} in change</div>` : ''}
+        </div>
+
+        <div class="row" style="margin-top:16px">
+          <button class="btn ghost" id="clearBtn" style="flex:0 0 auto">Clear</button>
+          <button class="btn primary big" id="doneBtn" ${payment ? '' : 'disabled'}>${payment ? `✓ Complete ${money2(total)}` : 'Pick how they paid'}</button>
+        </div>
+      </div>
+      ${lines.length ? '' : '<p class="empty">Tap an item to start a sale 👆</p>'}
+    `;
+
+    view.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { cart[b.dataset.add] = (cart[b.dataset.add] || 0) + 1; render(); });
+    view.querySelectorAll('[data-inc]').forEach(b => b.onclick = () => { cart[b.dataset.inc]++; render(); });
+    view.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => {
+      const k = b.dataset.dec;
+      if (--cart[k] <= 0) { delete cart[k]; delete customLines[k]; }
+      if (!cartLines().length) clearCart();
+      render();
+    });
+    view.querySelectorAll('[data-pay]').forEach(b => b.onclick = () => { payment = b.dataset.pay; if (payment !== 'Cash') cashGiven = null; render(); });
+    view.querySelectorAll('[data-cash]').forEach(b => b.onclick = () => { cashGiven = +b.dataset.cash; render(); });
+    $('#customBtn').onclick = () => {
+      const amt = prompt('Custom amount in dollars (use a minus sign for a discount, e.g. -1):');
+      if (amt == null) return;
+      const neg = String(amt).trim().startsWith('-');
+      const cents = toCents(amt) * (neg ? -1 : 1);
+      if (!cents) return toast('That amount did not look right');
+      const note = prompt('What is it for? (optional)', neg ? 'Discount' : 'Custom') || (neg ? 'Discount' : 'Custom');
+      const k = 'custom:' + uid();
+      customLines[k] = { name: note, price: cents };
+      cart[k] = 1;
+      render();
+    };
+    $('#clearBtn').onclick = () => { clearCart(); render(); };
+    $('#doneBtn').onclick = completeSale;
+    $('#undoBtn').onclick = () => {
+      const last = salesFor(cs.id).filter(x => !x.voided).pop();
+      if (!last) return;
+      if (!confirm(`Undo the last sale (${money2(last.total)}, ${last.items.map(i => `${i.qty}× ${i.name}`).join(', ')})?`)) return;
+      voidSale(last.id);
+    };
+  }
+
+  function completeSale() {
+    const cs = currentSession();
+    const lines = cartLines();
+    if (!cs || !lines.length || !payment) return;
+    const sale = {
+      id: uid(), sessionId: cs.id, at: new Date().toISOString(),
+      items: lines.map(l => ({ productId: l.productId, name: l.name, price: l.price, qty: l.qty })),
+      total: cartTotal(), payment, cashGiven: payment === 'Cash' ? cashGiven : null, voided: false,
+    };
+    touch(sale); touch(cs);
+    S.sales.push(sale);
+    save();
+    if (navigator.vibrate) navigator.vibrate(40);
+    toast(`💰 Sold! ${money2(sale.total)}`);
+    clearCart();
+    render();
+    sync();
+  }
+
+  function voidSale(id) {
+    const s = S.sales.find(x => x.id === id);
+    if (!s) return;
+    s.voided = !s.voided;
+    touch(s);
+    const sess = S.sessions.find(x => x.id === s.sessionId);
+    if (sess) touch(sess);
+    save(); sync();
+    toast(s.voided ? 'Sale removed' : 'Sale restored');
+    render();
+  }
+
+  function sessionReport(sess, { showClose }) {
+    const sales = salesFor(sess.id);
+    const sum = summarize(sales);
+    const end = sess.closedAt || new Date().toISOString();
+    const cashIn = sum.byPayment['Cash'] || 0;
+    const prodRows = Object.entries(sum.byProduct).sort((a, b) => b[1].total - a[1].total);
+    return `
+      <h2>${esc(sess.market)}</h2>
+      <p class="muted" style="margin-top:-6px">${fmtDate(sess.openedAt)} · ${fmtTime(sess.openedAt)}–${sess.closedAt ? fmtTime(sess.closedAt) : 'now'} (${fmtDur(sess.openedAt, end)})</p>
+      <div class="stats">
+        <div class="stat hero"><b>${money2(sum.revenue)}</b><span>total earned</span></div>
+        <div class="stat"><b>${sum.count}</b><span>sales</span></div>
+        <div class="stat"><b>${sum.items}</b><span>items sold</span></div>
+        <div class="stat"><b>${sum.count ? money2(Math.round(sum.revenue / sum.count)) : '–'}</b><span>avg sale</span></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">By item</h3>
+        ${prodRows.length ? `<table>
+          <tr><th>Item</th><th class="r">Qty</th><th class="r">Earned</th></tr>
+          ${prodRows.map(([n, v]) => `<tr><td>${esc(n)}</td><td class="r">${v.qty}</td><td class="r">${money2(v.total)}</td></tr>`).join('')}
+        </table>` : '<p class="muted">No sales yet.</p>'}
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">By payment</h3>
+        <table>
+          ${Object.entries(sum.byPayment).map(([m, v]) => `<tr><td>${esc(m)}</td><td class="r">${money2(v)}</td></tr>`).join('') || '<tr><td class="muted">—</td></tr>'}
+        </table>
+        ${sess.startCash || cashIn ? `<p style="margin:12px 0 0"><b>Cash box should have:</b> ${money2((sess.startCash || 0) + cashIn)}
+          <br><small class="muted">${money2(sess.startCash || 0)} starting + ${money2(cashIn)} cash sales</small></p>` : ''}
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Every sale</h3>
+        ${sales.length ? sales.slice().reverse().map(s => `
+          <div class="sale ${s.voided ? 'void' : ''}">
+            <div class="body">
+              <div>${s.items.map(i => `${i.qty}× ${esc(i.name)}`).join(', ')}</div>
+              <small>${fmtTime(s.at)} · ${esc(s.payment)}</small>
+            </div>
+            <div style="text-align:right">
+              <div class="amt">${money2(s.total)}</div>
+              <button class="linkish" data-void="${s.id}">${s.voided ? 'Restore' : 'Remove'}</button>
+            </div>
+          </div>`).join('') : '<p class="muted">No sales yet.</p>'}
+      </div>
+
+      ${showClose ? `<button class="btn danger block big" id="closeBtn">Close store for today</button>` : ''}
+    `;
+  }
+
+  function bindReport() {
+    view.querySelectorAll('[data-void]').forEach(b => b.onclick = () => {
+      const s = S.sales.find(x => x.id === b.dataset.void);
+      if (!s.voided && !confirm(`Remove this ${money2(s.total)} sale? (Use this for mistakes or refunds.)`)) return;
+      voidSale(b.dataset.void);
+    });
+  }
+
+  function renderToday() {
+    const cs = currentSession();
+    if (!cs) {
+      const last = S.sessions[S.sessions.length - 1];
+      if (!last) { view.innerHTML = '<p class="empty">No market days yet.<br>Open the store from the Sell tab.</p>'; return; }
+      view.innerHTML = `<p class="muted" style="margin-top:16px">Store is closed. Here's the last market day:</p>` + sessionReport(last, { showClose: false });
+      bindReport();
+      return;
+    }
+    view.innerHTML = sessionReport(cs, { showClose: true });
+    bindReport();
+    $('#closeBtn').onclick = () => {
+      const sum = summarize(salesFor(cs.id));
+      if (!confirm(`Close the store?\n\nYou earned ${money2(sum.revenue)} from ${sum.count} sales today. 🎉`)) return;
+      cs.closedAt = new Date().toISOString();
+      touch(cs);
+      S.currentSessionId = null;
+      clearCart();
+      save(); sync();
+      toast(`Great job! ${money2(sum.revenue)} today 🎉`);
+      render();
+    };
+  }
+
+  function renderHistory() {
+    if (viewingSessionId) {
+      const sess = S.sessions.find(s => s.id === viewingSessionId);
+      if (sess) {
+        view.innerHTML = `<button class="btn ghost" id="backBtn" style="margin-top:14px">← All market days</button>` +
+          sessionReport(sess, { showClose: false }) +
+          (sess.id !== S.currentSessionId ? `<button class="btn ghost block" id="delSess" style="margin-bottom:20px">Delete this market day</button>` : '');
+        bindReport();
+        $('#backBtn').onclick = () => { viewingSessionId = null; render(); };
+        const del = $('#delSess');
+        if (del) del.onclick = () => {
+          if (!confirm('Delete this whole market day from the phone? (It stays in the Google Sheet if synced.)')) return;
+          S.sales = S.sales.filter(x => x.sessionId !== sess.id);
+          S.sessions = S.sessions.filter(x => x.id !== sess.id);
+          viewingSessionId = null; save(); render();
+        };
+        return;
+      }
+      viewingSessionId = null;
+    }
+
+    const all = summarize(S.sales);
+    const sessions = S.sessions.slice().reverse();
+    const best = Object.entries(all.byProduct).sort((a, b) => b[1].qty - a[1].qty)[0];
+    view.innerHTML = `
+      <h2>All-time</h2>
+      <div class="stats">
+        <div class="stat hero"><b>${money2(all.revenue)}</b><span>earned across ${S.sessions.length} market day${S.sessions.length === 1 ? '' : 's'}</span></div>
+        <div class="stat"><b>${all.items}</b><span>items sold</span></div>
+        <div class="stat"><b>${S.sessions.length ? money2(Math.round(all.revenue / S.sessions.length)) : '–'}</b><span>per day</span></div>
+        <div class="stat"><b style="font-size:16px">${best ? esc(best[0]) : '–'}</b><span>best seller</span></div>
+      </div>
+      ${Object.keys(all.byProduct).length ? `
+      <div class="card">
+        <h3 style="margin-top:0">By item (all-time)</h3>
+        <table>
+          <tr><th>Item</th><th class="r">Qty</th><th class="r">Earned</th></tr>
+          ${Object.entries(all.byProduct).sort((a, b) => b[1].total - a[1].total)
+            .map(([n, v]) => `<tr><td>${esc(n)}</td><td class="r">${v.qty}</td><td class="r">${money2(v.total)}</td></tr>`).join('')}
+        </table>
+      </div>` : ''}
+      <h2>Market days</h2>
+      <div class="card" style="padding:4px 16px">
+        ${sessions.length ? sessions.map(s => {
+          const sm = summarize(salesFor(s.id));
+          return `<button class="session-row" data-sess="${s.id}">
+            <span class="body"><b>${esc(s.market)}</b>${s.id === S.currentSessionId ? ' <small style="color:var(--green)">● open</small>' : ''}<br>
+              <small class="muted">${fmtDate(s.openedAt)} · ${sm.count} sales · ${sm.items} items</small></span>
+            <b>${money2(sm.revenue)}</b><span class="muted">›</span>
+          </button>`;
+        }).join('') : '<p class="empty">No market days yet.</p>'}
+      </div>
+      ${S.sales.length ? '<button class="btn ghost block" id="csvBtn" style="margin:8px 0 20px">⬇️ Download all sales (CSV)</button>' : ''}
+    `;
+    view.querySelectorAll('[data-sess]').forEach(b => b.onclick = () => { viewingSessionId = b.dataset.sess; render(); window.scrollTo(0, 0); });
+    const csv = $('#csvBtn'); if (csv) csv.onclick = exportCsv;
+  }
+
+  function renderSettings() {
+    view.innerHTML = `
+      <h2>Products</h2>
+      <p class="muted" style="margin-top:-6px">Change names, prices and emojis. Untick “Show” to hide an item without losing its history.</p>
+      <div class="card" id="prodList">
+        ${S.products.map(p => `
+          <div class="prod-edit" data-pid="${p.id}">
+            <input type="text" data-f="emoji" value="${esc(p.emoji)}" style="text-align:center;font-size:22px" aria-label="Emoji">
+            <input type="text" data-f="name" value="${esc(p.name)}" aria-label="Name">
+            <input type="number" data-f="price" inputmode="decimal" step="0.01" min="0" value="${(p.price / 100).toFixed(2)}" aria-label="Price">
+            <div class="row2">
+              <label><input type="checkbox" data-f="active" ${p.active ? 'checked' : ''}> Show on Sell screen</label>
+              <span style="flex:1"></span>
+              <button class="linkish" data-delp="${p.id}">Delete</button>
+            </div>
+          </div>`).join('')}
+        <button class="btn block" id="addProd" style="margin-top:12px">+ Add product</button>
+      </div>
+
+      <h2>Payment types</h2>
+      <div class="card">
+        <label class="field" style="margin-top:0"><span>Separate with commas</span>
+          <input type="text" id="payList" value="${esc(S.payments.join(', '))}"></label>
+      </div>
+
+      <h2>Google Sheet backup</h2>
+      <div class="card">
+        <p class="muted" style="margin-top:0">Every sale is saved on this phone and sent to the Google Sheet.${S.lastSyncAt ? `<br>Last synced ${fmtDate(S.lastSyncAt)} ${fmtTime(S.lastSyncAt)}.` : ''}${S.lastSyncError ? `<br><span style="color:var(--red)">Last error: ${esc(S.lastSyncError)}</span>` : ''}</p>
+        <button class="btn primary block" id="syncNow">Sync now</button>
+        <button class="linkish" id="resyncAll" style="margin-top:10px;color:var(--muted)">Re-send everything to the sheet</button>
+      </div>
+
+      <h2>Data</h2>
+      <div class="card">
+        <div class="row">
+          <button class="btn ghost" id="csv2">⬇️ Sales CSV</button>
+          <button class="btn ghost" id="backup">💾 Full backup</button>
+        </div>
+        <button class="btn ghost block" id="lockNow" style="margin-top:12px">🔒 Lock this phone (log out)</button>
+        <button class="btn danger block" id="wipe" style="margin-top:12px">Erase everything on this phone</button>
+      </div>
+      <p class="muted" style="text-align:center;font-size:13px;margin-bottom:24px">Tip: “Add to Home Screen” from your browser’s share menu to use this like an app.</p>
+    `;
+
+    view.querySelectorAll('.prod-edit').forEach(row => {
+      const p = S.products.find(x => x.id === row.dataset.pid);
+      row.querySelectorAll('[data-f]').forEach(inp => inp.onchange = () => {
+        const f = inp.dataset.f;
+        if (f === 'price') p.price = toCents(inp.value);
+        else if (f === 'active') p.active = inp.checked;
+        else p[f] = inp.value.trim();
+        save(); toast('Saved');
+      });
+    });
+    view.querySelectorAll('[data-delp]').forEach(b => b.onclick = () => {
+      const p = S.products.find(x => x.id === b.dataset.delp);
+      if (!confirm(`Delete “${p.name}”? Past sales keep their record.`)) return;
+      S.products = S.products.filter(x => x !== p);
+      delete cart[p.id];
+      save(); render();
+    });
+    $('#addProd').onclick = () => {
+      S.products.push({ id: uid(), name: 'New item', price: 100, emoji: '⭐', active: true });
+      save(); render();
+      const inputs = view.querySelectorAll('.prod-edit:last-of-type input[data-f=name]');
+      if (inputs.length) { inputs[0].focus(); inputs[0].select(); }
+    };
+    $('#payList').onchange = e => {
+      const list = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+      S.payments = list.length ? list : DEFAULT_PAYMENTS.slice();
+      save(); toast('Saved');
+    };
+    $('#syncNow').onclick = () => sync(true);
+    $('#resyncAll').onclick = () => {
+      S.sales.forEach(x => x.sv = 0); S.sessions.forEach(x => x.sv = 0);
+      save(); sync(true);
+    };
+    $('#csv2').onclick = exportCsv;
+    $('#backup').onclick = () => download(`aansh-pos-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(S, null, 2), 'application/json');
+    $('#lockNow').onclick = () => {
+      if (S.sales.some(dirty) || S.sessions.some(dirty)) return toast('Sync first — some sales are not in the sheet yet');
+      if (!confirm('Lock the app? You will need the password to get back in.')) return;
+      S.password = ''; save(); render();
+    };
+    $('#wipe').onclick = () => {
+      if (!confirm('Erase ALL products, market days and sales from this phone? This cannot be undone.')) return;
+      if (prompt('Type ERASE to confirm') !== 'ERASE') return;
+      S = Object.assign(freshState(), { syncUrl: S.syncUrl, password: S.password }); clearCart(); save(); tab = 'sell'; render();
+    };
+  }
+
+  // ---------- export ----------
+  function download(name, text, type) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function exportCsv() {
+    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = [['Date', 'Time', 'Market', 'Sale ID', 'Item', 'Qty', 'Unit Price', 'Line Total', 'Payment', 'Removed']];
+    for (const s of S.sales) {
+      const sess = S.sessions.find(x => x.id === s.sessionId);
+      for (const i of s.items) {
+        rows.push([new Date(s.at).toLocaleDateString(), fmtTime(s.at), sess ? sess.market : '', s.id, i.name, i.qty,
+          (i.price / 100).toFixed(2), (i.price * i.qty / 100).toFixed(2), s.payment, s.voided ? 'yes' : '']);
+      }
+    }
+    download(`aansh-sales-${new Date().toISOString().slice(0, 10)}.csv`, rows.map(r => r.map(q).join(',')).join('\n'), 'text/csv');
+  }
+
+  // ---------- Google Sheet sync ----------
+  let syncing = false;
+  async function sync(manual = false) {
+    if (!unlocked() || syncing) return;
+    const sessions = S.sessions.filter(dirty);
+    const sales = S.sales.filter(dirty);
+    if (!sessions.length && !sales.length) { if (manual) toast('☁️ Already up to date'); renderSyncPill(); return; }
+    if (!navigator.onLine) { if (manual) toast('No internet — will sync later'); return; }
+
+    syncing = true;
+    const sentV = new Map([...sessions, ...sales].map(r => [r.id, r.v]));
+    const payload = {
+      password: S.password,
+      sessions: sessions.map(s => {
+        const sm = summarize(salesFor(s.id));
+        return { id: s.id, market: s.market, openedAt: s.openedAt, closedAt: s.closedAt, startCash: (s.startCash || 0) / 100,
+          sales: sm.count, items: sm.items, revenue: sm.revenue / 100,
+          byPayment: Object.fromEntries(Object.entries(sm.byPayment).map(([k, v]) => [k, v / 100])) };
+      }),
+      sales: sales.map(s => {
+        const sess = S.sessions.find(x => x.id === s.sessionId);
+        return { id: s.id, sessionId: s.sessionId, market: sess ? sess.market : '', at: s.at, payment: s.payment, voided: !!s.voided,
+          total: s.total / 100, items: s.items.map(i => ({ name: i.name, qty: i.qty, price: i.price / 100 })) };
+      }),
+    };
+    try {
+      // text/plain avoids a CORS preflight, which Apps Script can't answer.
+      const res = await fetch(S.syncUrl, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+      const out = await res.json();
+      if (out.error === 'unauthorized') { S.password = ''; toast('🔒 Password changed — please unlock again'); return; }
+      if (!out.ok) throw new Error(out.error || 'Sheet said no');
+      for (const r of [...S.sessions, ...S.sales]) if (sentV.has(r.id)) r.sv = sentV.get(r.id);
+      S.lastSyncAt = new Date().toISOString();
+      S.lastSyncError = null;
+      if (manual) toast('☁️ Synced to Google Sheet');
+    } catch (e) {
+      S.lastSyncError = String(e.message || e);
+      if (manual) toast('⚠️ Sync failed — saved on phone, will retry');
+    } finally {
+      syncing = false;
+      save();
+      renderSyncPill();
+      if (tab === 'settings' || !unlocked()) render();
+    }
+  }
+  window.addEventListener('online', () => sync());
+  setInterval(() => sync(), 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+
+  // ---------- boot ----------
+  document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => {
+    tab = b.dataset.tab; viewingSessionId = null; render(); window.scrollTo(0, 0);
+  });
+  $('#syncPill').onclick = () => sync(true);
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  render();
+  sync();
+})();
+</script>
+</body>
+</html>
