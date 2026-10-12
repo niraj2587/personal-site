@@ -121,6 +121,18 @@
   .stat.hero b { font-size: 36px; }
   .stat.hero span { color: rgba(255,255,255,.85); }
 
+  .profit { background: var(--line); border-radius: var(--radius); padding: 18px 16px; text-align: center; }
+  .profit span { display: block; font-size: 14px; font-weight: 600; opacity: .8; }
+  .profit b { display: block; font-size: 42px; line-height: 1.15; margin: 4px 0; }
+  .profit small { display: block; font-size: 15px; }
+  .profit.good { background: var(--green); color: #fff; }
+  .profit.bad { background: var(--amber-soft); color: #6a3d06; }
+  .eq { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; font-size: 16px; }
+  .eq.total { border-top: 2px solid var(--ink); margin-top: 4px; padding-top: 10px; font-size: 18px; font-weight: 800; }
+  .eq .plus { color: var(--green); }
+  .eq .minus { color: var(--red); }
+  .meter { height: 14px; border-radius: 99px; background: var(--green-soft); overflow: hidden; margin-top: 14px; }
+  .meter i { display: block; height: 100%; background: var(--green); border-radius: 99px; }
   table { width: 100%; border-collapse: collapse; }
   td, th { padding: 8px 4px; border-bottom: 1px solid var(--line); text-align: left; font-size: 15px; }
   th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
@@ -148,7 +160,7 @@
     background: #fff; border-top: 1px solid var(--line);
     padding-bottom: env(safe-area-inset-bottom);
   }
-  nav.tabs .wrap { display: grid; grid-template-columns: repeat(4, 1fr); padding: 0; }
+  nav.tabs .wrap { display: grid; grid-template-columns: repeat(5, 1fr); padding: 0; }
   nav.tabs button { min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 600; color: var(--muted); }
   nav.tabs button .ic { font-size: 22px; line-height: 1; }
   nav.tabs button.on { color: var(--green); }
@@ -190,6 +202,7 @@
   <div class="wrap">
     <button data-tab="sell"><span class="ic">🛒</span>Sell</button>
     <button data-tab="today"><span class="ic">📊</span>Today</button>
+    <button data-tab="money"><span class="ic">💰</span>Money</button>
     <button data-tab="history"><span class="ic">📅</span>History</button>
     <button data-tab="settings"><span class="ic">⚙️</span>Settings</button>
   </div>
@@ -218,6 +231,8 @@
       proto: 2,
       products: DEFAULT_PRODUCTS.map(p => ({ active: true, ...p })),   // + deleted
       cfg: { id: 'payments', list: DEFAULT_PAYMENTS.slice() },
+      finance: { id: 'finance', startMoney: 0 },   // cents he started the business with
+      expenses: [],   // supplies bought: {id: 'exp-…', at, what, amount (cents), deleted}
       sessions: [],   // {id, market, openedAt, closedAt, startCash, deleted}
       sales: [],      // {id, sessionId, at, items:[{productId,name,price,qty}], total, payment, cashGiven, voided}
       // Every record also has u (edited-at ms), v (local version), sv (version last sent to the server).
@@ -386,7 +401,7 @@
     const cs = currentSession();
     $('#hdrSub').textContent = cs ? `Open · ${cs.market}` : 'Store closed';
     renderSyncPill();
-    ({ sell: renderSell, today: renderToday, history: renderHistory, settings: renderSettings })[tab]();
+    ({ sell: renderSell, today: renderToday, money: renderMoney, history: renderHistory, settings: renderSettings })[tab]();
   }
 
   function renderSyncPill() {
@@ -671,6 +686,101 @@
     };
   }
 
+  // ---------- Money (profit, kid-friendly) ----------
+  const liveExpenses = () => S.expenses.filter(e => !e.deleted).sort(byTime('at')).reverse();
+
+  function renderMoney() {
+    const earned = summarize(liveSales()).revenue;
+    const spent = liveExpenses().reduce((a, e) => a + e.amount, 0);
+    const profit = earned - spent;
+    const start = S.finance.startMoney || 0;
+    const paidBack = spent ? Math.min(100, Math.round(earned / spent * 100)) : 0;
+
+    const verdict = !earned && !spent
+      ? { cls: '', big: '$0.00', msg: 'Add what you spent on supplies below, then go sell! 🚀' }
+      : profit > 0 ? { cls: 'good', big: money2(profit), msg: 'You’re making money! 🎉 That’s yours to keep.' }
+      : profit === 0 ? { cls: '', big: '$0.00', msg: 'You earned back exactly what you spent. Next sale is profit! 💪' }
+      : { cls: 'bad', big: money2(profit), msg: `Not yet — sell ${money2(-profit)} more to earn back what you spent. 💪` };
+
+    view.innerHTML = `
+      <h2>💰 My Money</h2>
+      <div class="profit ${verdict.cls}">
+        <span>Profit so far</span>
+        <b>${verdict.big}</b>
+        <small>${verdict.msg}</small>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">How profit works</h3>
+        <div class="eq"><span>💵 Money from sales</span><b class="plus">+ ${money2(earned)}</b></div>
+        <div class="eq"><span>🛒 Spent on supplies</span><b class="minus">− ${money2(spent)}</b></div>
+        <div class="eq total"><span>⭐ Profit</span><b>= ${money2(profit)}</b></div>
+        <p class="muted" style="margin:10px 0 0;font-size:14px">Profit is the money you keep after paying back what you spent to make your products.</p>
+        ${spent ? `
+          <div class="meter" role="img" aria-label="Earned back ${paidBack}% of supply costs"><i style="width:${paidBack}%"></i></div>
+          <p class="muted" style="margin:6px 0 0;font-size:14px">${paidBack >= 100 ? '✅ You’ve earned back all your supply money!' : `You’ve earned back <b>${paidBack}%</b> of what you spent on supplies.`}</p>` : ''}
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">🐷 My money box</h3>
+        <div class="eq"><span>Money I started with</span><b>${money2(start)}</b></div>
+        <div class="eq"><span>+ Money from sales</span><b class="plus">${money2(earned)}</b></div>
+        <div class="eq"><span>− Spent on supplies</span><b class="minus">${money2(spent)}</b></div>
+        <div class="eq total"><span>= I should have</span><b>${money2(start + profit)}</b></div>
+        <button class="btn ghost block" id="setStart" style="margin-top:12px">✏️ Change starting money</button>
+      </div>
+
+      <div class="card">
+        <div class="row" style="align-items:center">
+          <h3 style="margin:0">🛒 Supplies I bought</h3>
+          <button class="btn primary" id="addExp" style="flex:0 0 auto">+ Add</button>
+        </div>
+        ${liveExpenses().length ? liveExpenses().map(e => `
+          <div class="sale">
+            <div class="body"><div>${esc(e.what)}</div><small>${fmtDate(e.at)}</small></div>
+            <div style="text-align:right">
+              <div class="amt">${money2(e.amount)}</div>
+              <button class="linkish" data-delexp="${e.id}">Remove</button>
+            </div>
+          </div>`).join('') : '<p class="muted" style="margin:12px 0 0">Nothing yet. Add things like oats, honey, nuts, bags, magnets or paper.</p>'}
+      </div>
+    `;
+
+    $('#setStart').onclick = async () => {
+      const vals = await dialog({
+        message: 'How much money did you start your business with?',
+        fields: [{ label: 'Dollars', inputmode: 'decimal', placeholder: '20.00', value: start ? (start / 100).toFixed(2) : '' }],
+        ok: 'Save',
+      });
+      if (!vals) return;
+      S.finance.startMoney = toCents(vals[0]);
+      touch(S.finance); save(); sync(); render();
+    };
+    $('#addExp').onclick = async () => {
+      const vals = await dialog({
+        message: 'What did you buy?',
+        fields: [
+          { label: 'What', placeholder: 'e.g. Oats and honey' },
+          { label: 'How much did it cost? ($)', inputmode: 'decimal', placeholder: '12.00' },
+        ],
+        ok: 'Add',
+      });
+      if (!vals) return;
+      const what = vals[0].trim(), amount = toCents(vals[1]);
+      if (!what || !amount) return toast('Add what you bought and how much it cost');
+      const e = { id: 'exp-' + uid(), at: new Date().toISOString(), what, amount };
+      touch(e);
+      S.expenses.push(e);
+      save(); sync(); render();
+      toast(`Added ${what} — ${money2(amount)}`);
+    };
+    view.querySelectorAll('[data-delexp]').forEach(b => b.onclick = async () => {
+      const e = S.expenses.find(x => x.id === b.dataset.delexp);
+      if (!await ask(`Remove “${e.what}” (${money2(e.amount)})?`, { ok: 'Remove', danger: true })) return;
+      e.deleted = true; touch(e); save(); sync(); render();
+    });
+  }
+
   function renderHistory() {
     if (viewingSessionId) {
       const sess = liveSessions().find(s => s.id === viewingSessionId);
@@ -849,19 +959,25 @@
   }
 
   // ---------- Google Sheet sync ----------
-  const allRecords = () => [...S.sessions, ...S.sales, ...S.products, S.cfg];
+  // "config" records are small shared settings: payment types, the starting
+  // money, and each supply purchase (ids "exp-…").
+  const configRecords = () => [S.cfg, S.finance, ...S.expenses];
+  const allRecords = () => [...S.sessions, ...S.sales, ...S.products, ...configRecords()];
   const strip = ({ v, sv, ...rest }) => rest;
+  function configList(id) {
+    if (id === 'payments') return [S.cfg];
+    if (id === 'finance') return [S.finance];
+    if (String(id).startsWith('exp-')) return S.expenses;
+    return null;
+  }
 
   // Apply records downloaded from the server. Newest edit wins. Records are
   // updated in place so screens holding a reference keep seeing fresh data.
   function merge(records) {
     let changed = false;
     for (const { type, ...rec } of records) {
-      if (type === 'config') {
-        if (rec.id === 'payments' && (rec.u || 0) > (S.cfg.u || 0) && !dirty(S.cfg)) { Object.assign(S.cfg, rec, { v: 1, sv: 1 }); changed = true; }
-        continue;
-      }
-      const list = { session: S.sessions, sale: S.sales, product: S.products }[type];
+      const list = type === 'config' ? configList(rec.id)
+        : { session: S.sessions, sale: S.sales, product: S.products }[type];
       if (!list || !rec.id) continue;
       const local = list.find(x => x.id === rec.id);
       if (local && (local.u || 0) >= (rec.u || 0)) continue;
@@ -880,7 +996,7 @@
     if (!navigator.onLine) { if (manual) toast('No internet — will sync later'); return; }
 
     syncing = true;
-    const pending = [['session', S.sessions], ['sale', S.sales], ['product', S.products], ['config', [S.cfg]]]
+    const pending = [['session', S.sessions], ['sale', S.sales], ['product', S.products], ['config', configRecords()]]
       .flatMap(([type, list]) => list.filter(dirty).map(r => ({ type, r })));
     const sentV = new Map(pending.map(({ r }) => [r, r.v]));
     const sessions = pending.filter(p => p.type === 'session').map(p => p.r);
